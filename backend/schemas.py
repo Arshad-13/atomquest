@@ -20,3 +20,19 @@ class GoalResponse(GoalBase):
     
     class Config:
         from_attributes = True
+
+class UserBasic(BaseModel):
+    id: str
+    name: str
+
+    class Config:
+        from_attributes = True
+
+class TeamGoalResponse(GoalResponse):
+    owner: UserBasic  
+
+class GoalUpdate(BaseModel):
+    target: Optional[float] = None
+    weightage: Optional[float] = None
+    is_locked: Optional[bool] = None
+    manager_id: str 

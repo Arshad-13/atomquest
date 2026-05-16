@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useAppStore } from './store/useAppStore';
-// import { useIsAuthenticated, useMsal } from '@azure/msal-react';
+import { useMsal } from '@azure/msal-react';
 import { Login } from './components/Login';
 import { GoalForm } from './components/GoalForm'; // <--- Import the form
 
