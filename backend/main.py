@@ -2,6 +2,8 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
+import os
 
 from database import get_db
 import models
@@ -9,9 +11,15 @@ import schemas
 
 app = FastAPI()
 
+raw_origins = os.getenv("ALLOWED_ORIGINS")
+if raw_origins:
+    allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+else:
+    allowed_origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
     allow_credentials=True
@@ -30,6 +38,23 @@ def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db)):
     - Total weightage cannot exceed 100%
     """
     
+    owner = db.query(models.User).filter(models.User.id == goal.owner_id).first()
+    if not owner:
+        if os.getenv("DEV_AUTO_CREATE_USER", "").lower() == "true":
+            owner = models.User(
+                id=goal.owner_id,
+                name="Dev User",
+                email=f"{goal.owner_id}@dev.local"
+            )
+            db.add(owner)
+            db.commit()
+            db.refresh(owner)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="Owner does not exist. Create a user first."
+            )
+
     # Rule 1: Check maximum goals limit (Max 8)
     current_goals_count = db.query(models.Goal).filter(models.Goal.owner_id == goal.owner_id).count()
     if current_goals_count >= 8:
@@ -60,9 +85,16 @@ def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db)):
         weightage=goal.weightage
     )
     
-    db.add(new_goal)
-    db.commit()
-    db.refresh(new_goal)
+    try:
+        db.add(new_goal)
+        db.commit()
+        db.refresh(new_goal)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Goal could not be created. Check owner_id and payload."
+        )
     
     return new_goal
 
