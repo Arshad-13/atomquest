@@ -36,6 +36,10 @@ export const AdminLockedGoalsPage = () => {
   const [activeTab, setActiveTab] = useState<'locked' | 'shared'>('locked');
   const [searchTerm, setSearchTerm] = useState("");
 
+  // Grouping Options for Locked Goals
+  const [groupByEmployee, setGroupByEmployee] = useState(true); // Default to grouped (organised) view for best UX!
+  const [expandedEmployees, setExpandedEmployees] = useState<{ [email: string]: boolean }>({});
+
   // Locked Goals State
   const [goals, setGoals] = useState<LockedGoal[]>([]);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
@@ -133,15 +137,42 @@ export const AdminLockedGoalsPage = () => {
     }
   };
 
+  // Toggle Employee Folder Expand State
+  const toggleEmployeeExpand = (email: string) => {
+    setExpandedEmployees(prev => ({
+      ...prev,
+      [email]: !prev[email]
+    }));
+  };
+
   // Filter lists based on search
   const filteredLockedGoals = goals.filter(g => 
     g.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    g.owner_name.toLowerCase().includes(searchTerm.toLowerCase())
+    g.owner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    g.owner_email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredSharedGoals = sharedGoals.filter(sg => 
     sg.title.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Grouping math for locked goals under organised view
+  const groupedLockedGoals = filteredLockedGoals.reduce((acc, goal) => {
+    const email = goal.owner_email;
+    if (!acc[email]) {
+      acc[email] = {
+        name: goal.owner_name,
+        email: goal.owner_email,
+        goals: [],
+        total_weightage: 0
+      };
+    }
+    acc[email].goals.push(goal);
+    acc[email].total_weightage += goal.weightage;
+    return acc;
+  }, {} as { [email: string]: { name: string; email: string; goals: LockedGoal[]; total_weightage: number } });
+
+  const groupedList = Object.values(groupedLockedGoals);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -152,14 +183,6 @@ export const AdminLockedGoalsPage = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">System Override Console</h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Manage locked goal overrides and active shared goal cascades. All actions are permanently logged.</p>
         </div>
-        
-        <input 
-          type="text"
-          placeholder={activeTab === 'locked' ? "Search locked goals..." : "Search shared goals..."}
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="p-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-surface-dark outline-none focus:ring-2 focus:ring-red-500 w-full sm:w-72"
-        />
       </div>
 
       {/* Tabs */}
@@ -182,52 +205,196 @@ export const AdminLockedGoalsPage = () => {
         </button>
       </div>
 
+      {/* Control Console (Search + Folders Toggle) */}
+      {!loading && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-3.5 bg-gray-50/50 dark:bg-gray-900/20 border border-gray-200/50 dark:border-gray-800/40 rounded-xl">
+          
+          {/* Toggle Switch (Only for Locked Goals tab) */}
+          {activeTab === 'locked' ? (
+            <div className="flex items-center gap-4">
+              <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                <input 
+                  type="checkbox"
+                  checked={groupByEmployee}
+                  onChange={(e) => setGroupByEmployee(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="relative w-10 h-5 bg-gray-250 dark:bg-gray-800 rounded-full peer peer-focus:ring-2 peer-focus:ring-red-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:bg-gray-100 peer-checked:bg-red-600"></div>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-350 flex items-center gap-1.5">
+                  📁 Group Goals by Employee
+                  <span className="text-xs font-normal text-gray-400 dark:text-gray-500">(Organised Folder View)</span>
+                </span>
+              </label>
+            </div>
+          ) : (
+            <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+              Active Corporate Cascades Console
+            </div>
+          )}
+
+          {/* Search Box */}
+          <input 
+            type="text"
+            placeholder={activeTab === 'locked' ? "Search employee name, email or goal title..." : "Search shared goals..."}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="p-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-surface-dark outline-none focus:ring-2 focus:ring-red-555 w-full md:w-80"
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="flex justify-center items-center h-64"><Spinner className="w-8 h-8 text-primary-600" /></div>
       ) : activeTab === 'locked' ? (
-        /* LOCKED GOALS SECTION */
-        <Card className="overflow-hidden border-red-100 dark:border-red-900/30">
+        
+        /* LOCKED GOALS VIEW DECK */
+        <div>
           {filteredLockedGoals.length === 0 ? (
-            <EmptyState icon="🔒" title="No locked goals found" description="There are currently no locked goals matching your search." />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    <th className="p-4 font-semibold pl-6">Goal ID & Title</th>
-                    <th className="p-4 font-semibold">Owner</th>
-                    <th className="p-4 font-semibold text-center">Weightage</th>
-                    <th className="p-4 font-semibold pr-6 text-right">Admin Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-surface-dark">
-                  {filteredLockedGoals.map((goal) => (
-                    <tr key={goal.id} className="hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-colors">
-                      <td className="p-4 pl-6">
-                        <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">#{goal.id} — {goal.title}</p>
-                        <span className="inline-block mt-1 text-[10px] font-mono uppercase text-gray-400 tracking-wider">
-                          {goal.thrust_area}
+            <Card className="p-6">
+              <EmptyState icon="🔒" title="No locked goals found" description="There are currently no locked goals matching your search." />
+            </Card>
+          ) : groupByEmployee ? (
+            
+            /* ORGANISED ACCORDION FOLDER VIEW */
+            <div className="space-y-4">
+              {groupedList.map((emp) => {
+                const isOpen = !!expandedEmployees[emp.email];
+                return (
+                  <Card key={emp.email} className={`overflow-hidden border transition-all duration-200 ${
+                    isOpen 
+                      ? 'border-red-200 dark:border-red-900/60 shadow-sm ring-1 ring-red-500/10' 
+                      : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+                  }`}>
+                    
+                    {/* Folder Header */}
+                    <div 
+                      onClick={() => toggleEmployeeExpand(emp.email)}
+                      className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer bg-white dark:bg-surface-dark hover:bg-gray-50/50 dark:hover:bg-gray-800/10 select-none"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl leading-none">{isOpen ? '📂' : '📁'}</span>
+                        <div>
+                          <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base flex items-center gap-2">
+                            {emp.name}
+                            <span className="text-xs font-normal text-gray-400 dark:text-gray-500">({emp.email})</span>
+                          </h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            Reporting sheet consists of locked metrics. Click to view goals.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Stat Indicators */}
+                      <div className="flex items-center gap-3.5 pl-9 sm:pl-0">
+                        <span className="text-xs font-bold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                          🔒 {emp.goals.length} Locked Goals
                         </span>
-                      </td>
-                      <td className="p-4">
-                        <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{goal.owner_name}</p>
-                        <p className="text-xs text-gray-500">{goal.owner_email}</p>
-                      </td>
-                      <td className="p-4 text-center">
-                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{goal.weightage}%</span>
-                      </td>
-                      <td className="p-4 pr-6 text-right">
-                        <Button variant="danger" size="sm" onClick={() => handleOpenUnlock(goal)}>
-                          🔓 Force Unlock
-                        </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                        
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider ${
+                          emp.total_weightage === 100
+                            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border-green-200 dark:border-green-800/40'
+                            : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                        }`}>
+                          Weight: {emp.total_weightage}%
+                        </span>
+
+                        <span className="text-gray-400 dark:text-gray-600 font-bold transition-transform duration-200 transform">
+                          {isOpen ? '▲' : '▼'}
+                        </span>
+                      </div>
+
+                    </div>
+
+                    {/* Collapsible Goals Content */}
+                    {isOpen && (
+                      <div className="border-t border-gray-150 dark:border-gray-800 bg-gray-50/20 dark:bg-gray-900/5 overflow-x-auto">
+                        <table className="w-full text-left border-collapse whitespace-nowrap">
+                          <thead>
+                            <tr className="bg-gray-50 dark:bg-gray-950/40 text-[10px] uppercase tracking-wider font-semibold text-gray-450 dark:text-gray-500 border-b border-gray-200 dark:border-gray-850">
+                              <th className="p-3 pl-6">Goal ID & Title</th>
+                              <th className="p-3">Thrust Area</th>
+                              <th className="p-3 text-center">Weightage</th>
+                              <th className="p-3 pr-6 text-right">System Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100 dark:divide-gray-850 bg-white dark:bg-surface-dark">
+                            {emp.goals.map((goal) => (
+                              <tr key={goal.id} className="hover:bg-red-50/20 dark:hover:bg-red-900/5 transition-colors">
+                                <td className="p-3.5 pl-6">
+                                  <p className="font-semibold text-gray-950 dark:text-gray-100 text-sm">#{goal.id} — {goal.title}</p>
+                                </td>
+                                <td className="p-3.5">
+                                  <span className="inline-block text-[10px] font-mono uppercase text-gray-450 dark:text-gray-400 tracking-wider">
+                                    {goal.thrust_area}
+                                  </span>
+                                </td>
+                                <td className="p-3.5 text-center">
+                                  <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{goal.weightage}%</span>
+                                </td>
+                                <td className="p-3.5 pr-6 text-right">
+                                  <Button 
+                                    variant="danger" 
+                                    size="sm" 
+                                    className="text-[11px] font-bold px-2.5 py-1"
+                                    onClick={() => handleOpenUnlock(goal)}
+                                  >
+                                    🔓 Force Unlock
+                                  </Button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                  </Card>
+                );
+              })}
             </div>
+          ) : (
+            
+            /* ORIGINAL FLAT LIST VIEW (PRESERVED AS REQUESTED) */
+            <Card className="overflow-hidden border-red-150 dark:border-red-900/30">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800 text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                      <th className="p-4 font-semibold pl-6">Goal ID & Title</th>
+                      <th className="p-4 font-semibold">Owner</th>
+                      <th className="p-4 font-semibold text-center">Weightage</th>
+                      <th className="p-4 font-semibold pr-6 text-right">Admin Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-surface-dark">
+                    {filteredLockedGoals.map((goal) => (
+                      <tr key={goal.id} className="hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-colors">
+                        <td className="p-4 pl-6">
+                          <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">#{goal.id} — {goal.title}</p>
+                          <span className="inline-block mt-1 text-[10px] font-mono uppercase text-gray-450 tracking-wider">
+                            {goal.thrust_area}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <p className="font-medium text-gray-900 dark:text-gray-100 text-sm">{goal.owner_name}</p>
+                          <p className="text-xs text-gray-500">{goal.owner_email}</p>
+                        </td>
+                        <td className="p-4 text-center">
+                          <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{goal.weightage}%</span>
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <Button variant="danger" size="sm" onClick={() => handleOpenUnlock(goal)}>
+                            🔓 Force Unlock
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
           )}
-        </Card>
+        </div>
       ) : (
         /* SHARED GOALS SECTION */
         <Card className="overflow-hidden border-red-100 dark:border-red-900/30">
@@ -249,7 +416,7 @@ export const AdminLockedGoalsPage = () => {
                     <tr key={sg.id} className="hover:bg-red-50/30 dark:hover:bg-red-900/10 transition-colors">
                       <td className="p-4 pl-6 max-w-sm whitespace-normal">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{sg.title}</p>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{sg.description}</p>
+                        <p className="text-xs text-gray-550 mt-1 line-clamp-2">{sg.description}</p>
                         <span className="inline-block mt-2 text-[10px] font-mono uppercase text-gray-400 tracking-wider">
                           {sg.thrust_area}
                         </span>
@@ -301,6 +468,7 @@ export const AdminLockedGoalsPage = () => {
               value={unlockReason}
               onChange={(e) => setUnlockReason(e.target.value)}
               className="w-full p-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-surface-dark outline-none focus:ring-2 focus:ring-red-500"
+              required
             />
           </div>
 
@@ -334,6 +502,7 @@ export const AdminLockedGoalsPage = () => {
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               className="w-full p-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-surface-dark outline-none focus:ring-2 focus:ring-red-500"
+              required
             />
           </div>
 
