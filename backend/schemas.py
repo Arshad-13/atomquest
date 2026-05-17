@@ -9,10 +9,11 @@ class GoalBase(BaseModel):
     description: Optional[str] = None
     uom: UoMEnum
     target: float
-    weightage: float = Field(..., ge=10, le=100, description="Min. 10, Max. 100")
+    weightage: float = Field(..., ge=0, description="Weightage percentage")
     
 class GoalCreate(GoalBase):
     owner_id: str
+    weightage: float = Field(..., ge=10, le=100, description="Min. 10%, Max. 100%")
     
 class GoalResponse(GoalBase):
     id: int
@@ -85,7 +86,15 @@ class AuditLogResponse(BaseModel):
         from_attributes = True
 
 class SharedGoalCreate(BaseModel):
-    base_goal_id: int
+    # Fan-out fields (used by push_shared_goal)
+    title: Optional[str] = None
+    description: Optional[str] = None
+    thrust_area: Optional[str] = None
+    uom: Optional[str] = None
+    target: Optional[float] = None
+    weightage: Optional[float] = None
+    # Link fields (used when base_goal_id already exists)
+    base_goal_id: Optional[int] = None
     recipient_ids: List[str]
     primary_owner_id: str
 
@@ -166,15 +175,7 @@ class TeamCheckInResponse(BaseModel):
     class Config:
         from_attributes = True
         
-class SharedGoalCreate(BaseModel):
-    title: str
-    description: str
-    thrust_area: str
-    uom: str
-    target: float
-    weightage: float
-    recipient_ids: List[str]
-    primary_owner_id: str
+# SharedGoalCreate is defined above (line ~87) — no duplicate needed.
     
 class AdminCompletionRow(BaseModel):
     user_id: str

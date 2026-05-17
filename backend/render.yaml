@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: atomquest-backend
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Set manually in Render dashboard (Supabase connection string)
+      - key: SECRET_KEY
+        generateValue: true  # Render auto-generates a secure random value
+      - key: ALLOWED_ORIGINS
+        sync: false          # Set to your Vercel frontend URL e.g. https://atomquest.vercel.app
+      - key: AZURE_TENANT_ID
+        sync: false          # Your Azure AD tenant ID
+      - key: AZURE_ADMIN_GROUP_ID
+        sync: false          # Azure AD group Object ID for Admin role
+      - key: AZURE_MANAGER_GROUP_ID
+        sync: false          # Azure AD group Object ID for Manager role
+      - key: PYTHON_VERSION
+        value: "3.11.0"

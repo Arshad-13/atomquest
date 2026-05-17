@@ -1,7 +1,18 @@
+import { useEffect } from 'react';
 import { useToastStore } from '../../store/useToastStore';
 
 export const ToastContainer = () => {
-  const { toasts, removeToast } = useToastStore();
+  const { toasts, removeToast, addToast } = useToastStore();
+
+  // Listen for api-error events dispatched by the Axios response interceptor
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const { type, message } = (e as CustomEvent).detail;
+      addToast(message, type);
+    };
+    window.addEventListener('api-error', handler);
+    return () => window.removeEventListener('api-error', handler);
+  }, [addToast]);
 
   return (
     <div className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2">

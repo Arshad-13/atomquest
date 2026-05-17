@@ -30,16 +30,14 @@ function App() {
   const { user, token, setAuth, logout } = useAppStore();
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // JWT Session Hydration
+  // JWT session hydration on reload
   useEffect(() => {
     const initializeAuth = async () => {
       if (token && !user) {
         try {
           const response = await apiClient.get('/auth/me');
           setAuth(response.data, token);
-        } catch (error) {
-          logout();
-        }
+        } catch { logout(); }
       }
       setIsInitializing(false);
     };
@@ -54,7 +52,7 @@ function App() {
     <BrowserRouter>
     <ToastContainer />
       <Routes>
-        {/* Public Route */}
+        {/* Public Routes */}
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
 
         {/* Protected App Shell */}

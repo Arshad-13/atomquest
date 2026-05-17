@@ -53,7 +53,7 @@ export const GoalDetailPage = () => {
       try {
         // Run fetches in parallel for speed
         const [goalRes, checkInsRes, historyRes] = await Promise.all([
-          apiClient.get(`/goals/detail/${id}`).catch(() => apiClient.get(`/goals`).then(res => ({ data: res.data.find((g: any) => g.id === Number(id)) }))), // Fallback if detail endpoint isn't ready
+          apiClient.get(`/goals/detail/${id}`),
           apiClient.get(`/goals/${id}/check-ins`).catch(() => ({ data: [] })),
           apiClient.get(`/goals/${id}/history`).catch(() => ({ data: [] }))
         ]);

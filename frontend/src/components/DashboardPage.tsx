@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import { useAppStore } from '../store/useAppStore';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
-import { Spinner } from './ui/Spinner';
+import { PageSkeleton, ErrorCard } from './ui/Skeleton';
 import { EmptyState } from './ui/EmptyState';
 import { useToastStore } from '../store/useToastStore';
 
@@ -29,32 +29,31 @@ export const DashboardPage = () => {
   const { addToast } = useToastStore();
   
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeCycle, setActiveCycle] = useState<ActiveCycle | null>(null);
   const [goals, setGoals] = useState<DashboardGoal[]>([]);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        // Fetch Active Cycle (Phase 2 API)
-        const cycleRes = await apiClient.get('/cycles/active').catch(() => ({ data: null }));
-        setActiveCycle(cycleRes.data);
-
-        // Fetch User's Goals to calculate stats
-        const goalsRes = await apiClient.get(`/goals/${user?.id}`);
-        setGoals(goalsRes.data);
-      } catch (err) {
-        addToast("Failed to load dashboard data", "error");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (user?.id) fetchDashboardData();
+  const fetchDashboardData = useCallback(async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const cycleRes = await apiClient.get('/cycles/active').catch(() => ({ data: null }));
+      setActiveCycle(cycleRes.data);
+      const goalsRes = await apiClient.get(`/goals/${user?.id}`);
+      setGoals(goalsRes.data);
+    } catch (err) {
+      setError('Failed to load dashboard data. Please check your connection.');
+      addToast("Failed to load dashboard data", "error");
+    } finally {
+      setLoading(false);
+    }
   }, [user?.id, addToast]);
 
-  if (loading) {
-    return <div className="flex justify-center items-center h-64"><Spinner className="w-8 h-8 text-primary-600" /></div>;
-  }
+  useEffect(() => { fetchDashboardData(); }, [fetchDashboardData]);
+
+  if (loading) return <PageSkeleton statCards rows={4} cols={4} />;
+  if (error) return <ErrorCard message={error} onRetry={fetchDashboardData} />;
 
   // --- Calculate Dynamic Stats ---
   const totalGoals = goals.length;

@@ -45,6 +45,7 @@ export const GoalForm = () => {
   const [goalCount, setGoalCount] = useState(0);
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<GoalFormData>({
+    mode: 'onBlur',
     defaultValues: { weightage: 10, uom: 'min', thrust_area: THRUST_AREAS[0], description: '' }
   });
 
@@ -201,11 +202,11 @@ export const GoalForm = () => {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Goal Title</label>
               <input 
-                {...register('title', { required: "Title is required" })}
-                className="w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none transition-shadow"
+                {...register('title', { required: "Title is required", minLength: { value: 5, message: "Title must be at least 5 characters" } })}
+                className={`w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border focus:ring-2 focus:ring-primary-500 outline-none transition-shadow ${errors.title ? 'border-red-400 dark:border-red-600 ring-1 ring-red-400' : 'border-gray-300 dark:border-gray-700'}`}
                 placeholder="e.g., Increase Q2 Enterprise Sales by 15%"
               />
-              {errors.title && <span className="text-xs text-red-500 mt-1">{errors.title.message}</span>}
+              {errors.title && <span className="text-xs text-red-500 mt-1 block">{errors.title.message}</span>}
             </div>
 
             {/* Target Value */}
@@ -213,10 +214,11 @@ export const GoalForm = () => {
               <label className="block text-sm font-medium mb-1.5 text-gray-700 dark:text-gray-300">Target Number</label>
               <input 
                 type="number" step="any"
-                {...register('target', { required: "Target is required", valueAsNumber: true })}
-                className="w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none transition-shadow"
+                {...register('target', { required: "Target is required", valueAsNumber: true, validate: v => !isNaN(v) || 'Must be a valid number' })}
+                className={`w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border focus:ring-2 focus:ring-primary-500 outline-none transition-shadow ${errors.target ? 'border-red-400 dark:border-red-600 ring-1 ring-red-400' : 'border-gray-300 dark:border-gray-700'}`}
                 placeholder="e.g., 100000"
               />
+              {errors.target && <span className="text-xs text-red-500 mt-1 block">{errors.target.message}</span>}
             </div>
 
             {/* UoM */}
@@ -241,11 +243,12 @@ export const GoalForm = () => {
                 {...register('weightage', { 
                   required: "Weightage is required",
                   min: { value: 10, message: "Minimum weightage is 10%" },
+                  max: { value: 100, message: "Maximum weightage is 100%" },
                   valueAsNumber: true
                 })}
-                className="w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border border-gray-300 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 outline-none transition-shadow"
+                className={`w-full p-2.5 rounded-lg bg-background-light dark:bg-background-dark border focus:ring-2 focus:ring-primary-500 outline-none transition-shadow ${errors.weightage ? 'border-red-400 dark:border-red-600 ring-1 ring-red-400' : 'border-gray-300 dark:border-gray-700'}`}
               />
-              {errors.weightage && <span className="text-xs text-red-500 mt-1">{errors.weightage.message}</span>}
+              {errors.weightage && <span className="text-xs text-red-500 mt-1 block">{errors.weightage.message}</span>}
             </div>
 
             {/* Description with Char Count */}

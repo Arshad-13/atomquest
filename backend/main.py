@@ -1,5 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, aliased
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
@@ -32,6 +34,34 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True
 )
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Converts FastAPI's 422 validation errors into a consistent, readable format."""
+    errors = exc.errors()
+    readable = " | ".join(
+        f"{'.'.join(str(l) for l in e['loc'][1:])}: {e['msg']}" for e in errors
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": readable or "Validation failed.", "code": "VALIDATION_ERROR"}
+    )
+
+@app.exception_handler(IntegrityError)
+async def integrity_exception_handler(request: Request, exc: IntegrityError):
+    """Catches DB constraint violations (duplicate keys, FK failures, etc.)."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "A database constraint was violated. The record may already exist.", "code": "INTEGRITY_ERROR"}
+    )
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Catch-all for any unhandled server-side error."""
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected server error occurred.", "code": "INTERNAL_ERROR"}
+    )
 
 @app.get("/health")
 @app.head("/health")
@@ -174,6 +204,17 @@ def build_check_in_response(check_in: models.CheckIn, goal: models.Goal) -> sche
         progress_score=score
     )
 
+@app.get("/goals/detail/{goal_id}", response_model=schemas.GoalResponse)
+def get_goal_by_id(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Fetch a single goal by its numeric ID. Used by GoalDetailPage."""
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    # Employees can only view their own goals
+    if current_user.role == models.RoleEnum.EMPLOYEE and goal.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    return goal
+
 @app.get("/goals/{owner_id}", response_model=list[schemas.GoalResponse])
 def get_employee_goals(owner_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Fetches all goals for a specific employee."""
@@ -181,6 +222,7 @@ def get_employee_goals(owner_id: str, db: Session = Depends(get_db), current_use
         raise HTTPException(status_code=403, detail="Forbidden")
     goals = db.query(models.Goal).filter(models.Goal.owner_id == owner_id).all()
     return goals
+
 
 @app.get("/managers/{manager_id}/team-goals", response_model=List[schemas.TeamGoalResponse])
 def get_team_goals(manager_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))):
@@ -395,29 +437,8 @@ def review_check_in(check_in_id: int, review: schemas.CheckInReview, db: Session
     
     return build_check_in_response(check_in, goal)
 
-@app.post("/goals/shared", response_model=List[schemas.SharedGoalLinkResponse])
-def create_shared_goals(shared: schemas.SharedGoalCreate, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))):
-    """Manager creates shared goals. Creates one shared_goal_links row per recipient."""
-    base_goal = db.query(models.Goal).filter(models.Goal.id == shared.base_goal_id).first()
-    if not base_goal:
-        raise HTTPException(status_code=404, detail="Base goal not found")
-        
-    links = []
-    for recipient_id in shared.recipient_ids:
-        link = models.SharedGoalLink(
-            base_goal_id=shared.base_goal_id,
-            primary_owner_id=shared.primary_owner_id,
-            recipient_id=recipient_id,
-            custom_weightage=base_goal.weightage
-        )
-        db.add(link)
-        links.append(link)
-        
-    db.commit()
-    for link in links:
-        db.refresh(link)
-        
-    return links
+# NOTE: POST /goals/shared is defined below (push_shared_goal) with the full fan-out logic.
+# This stub has been intentionally removed to eliminate the duplicate route conflict.
 
 @app.patch("/goals/shared/{link_id}/weightage", response_model=schemas.SharedGoalLinkResponse)
 def update_shared_weightage(link_id: int, update: schemas.SharedGoalWeightageUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -522,41 +543,8 @@ def activate_cycle_window(cycle_id: int, db: Session = Depends(get_db), current_
     db.commit()
     db.refresh(new_active)
     return new_active
-@app.get("/admin/completion-dashboard", response_model=List[schemas.CompletionRow])
-def get_completion_dashboard(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
-    """Returns per-employee check-in completion status for the active window."""
-    users = db.query(models.User).filter(models.User.role == models.RoleEnum.EMPLOYEE).all()
-    active_cycle = db.query(models.CycleWindow).filter(models.CycleWindow.is_active == True).first()
-    
-    results = []
-    for u in users:
-        goals_sub = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.status == "submitted").count()
-        goals_app = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.status == "approved").count()
-        
-        check_in_status = "not started"
-        if active_cycle and active_cycle.period_name.startswith("Q"):
-            total_approved = goals_app
-            if total_approved > 0:
-                checkins_done = db.query(models.CheckIn).join(models.Goal).filter(
-                    models.Goal.owner_id == u.id,
-                    models.CheckIn.quarter == active_cycle.period_name
-                ).count()
-                if checkins_done == 0:
-                    check_in_status = "not started"
-                elif checkins_done < total_approved:
-                    check_in_status = "in progress"
-                else:
-                    check_in_status = "completed"
-                    
-        results.append(schemas.CompletionRow(
-            id=u.id,
-            name=u.name,
-            department="Engineering", # Using a generic bucket to satisfy dashboard UI requirement
-            goals_submitted=goals_sub,
-            goals_approved=goals_app,
-            check_in_status=check_in_status
-        ))
-    return results
+# NOTE: GET /admin/completion-dashboard is defined below with the full AdminCompletionRow schema.
+# This weaker stub has been removed to eliminate the duplicate route conflict.
 
 @app.post("/admin/goals/{goal_id}/unlock")
 def unlock_goal(goal_id: int, req: schemas.UnlockRequest, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
@@ -791,7 +779,7 @@ def push_shared_goal(
     current_user: models.User = Depends(get_current_user)
 ):
     """Creates a master goal and cascades it to selected direct reports."""
-    if current_user.role.upper() not in ["MANAGER", "ADMIN"]:
+    if current_user.role not in [models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]:
         raise HTTPException(status_code=403, detail="Unauthorized.")
 
     # 1. Create the Master "Base" Goal (Owned by the Manager)
