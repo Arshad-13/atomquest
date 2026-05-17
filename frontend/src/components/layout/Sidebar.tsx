@@ -14,9 +14,15 @@ export const Sidebar = () => {
   // Base navigation for everyone (Paths updated to match new App.tsx router)
   const navItems = [
     { label: 'Dashboard', path: '/dashboard', roles: ['employee', 'manager', 'admin'] },
-    { label: 'My Goals', path: '/goals', roles: ['employee', 'manager', 'admin'] },
-    { label: 'Check-ins', path: '/checkins', roles: ['employee', 'manager', 'admin'] },
   ];
+
+  // Personal OKR goal sheet and check-in panels only apply to employees and managers, not root HR admins
+  if (role === 'employee' || role === 'manager') {
+    navItems.push(
+      { label: 'My Goals', path: '/goals', roles: ['employee', 'manager'] },
+      { label: 'Check-ins', path: '/checkins', roles: ['employee', 'manager'] }
+    );
+  }
 
   // Manager-specific navigation
   if (role === 'manager' || role === 'admin') {
