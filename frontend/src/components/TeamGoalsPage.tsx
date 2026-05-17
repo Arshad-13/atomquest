@@ -43,7 +43,7 @@ export const TeamGoalsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all' | 'analytics'>('pending');
   const [rawGoals, setRawGoals] = useState<TeamGoal[]>([]);
-  const [directReports, setDirectReports] = useState<EmployeeBasic[]>([]);
+  const [directReports, setDirectReports] = useState<any[]>([]);
   const [analyticsData, setAnalyticsData] = useState<{ bar_data: any[], heatmap_data: any[] } | null>(null);
   const [expandedEmployees, setExpandedEmployees] = useState<{ [key: string]: boolean }>({});
   
@@ -211,7 +211,13 @@ export const TeamGoalsPage = () => {
   });
 
   // Extract a clean list of direct reports from the grouped sheets
-  const directReportsList = Object.values(groupedSheets).map(sheet => sheet.employee);
+  const directReportsList = Object.values(groupedSheets).map(sheet => ({
+    id: sheet.employee.id,
+    name: sheet.employee.name,
+    role: 'employee',
+    total_weightage: sheet.goals.reduce((acc, g) => acc + g.weightage, 0),
+    is_locked: sheet.goals.every(g => g.is_locked)
+  }));
 
   if (loading) {
     return <div className="flex justify-center items-center h-64"><Spinner className="w-8 h-8 text-primary-600" /></div>;

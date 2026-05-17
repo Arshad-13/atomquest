@@ -436,7 +436,7 @@ export const AdminUsersPage = () => {
             <Button type="button" variant="secondary" onClick={() => setResetModalOpen(false)} disabled={submittingReset}>
               Cancel
             </Button>
-            <Button type="submit" variant="warning" className="bg-amber-600 hover:bg-amber-700 text-white" isLoading={submittingReset}>
+            <Button type="submit" variant="danger" className="bg-amber-600 hover:bg-amber-700 text-white" isLoading={submittingReset}>
               Confirm Password Reset
             </Button>
           </div>
