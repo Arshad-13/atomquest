@@ -1147,9 +1147,9 @@ def get_admin_executive_analytics(
             score = calculate_progress_score(c.actual_achievement, goal.target, goal.uom)
             
             # Segment metrics by department profiles
-            if owner.role.upper() == "EMPLOYEE":
+            if owner.role == models.RoleEnum.EMPLOYEE:
                 eng_scores.append(score)
-            elif owner.role.upper() == "MANAGER":
+            elif owner.role == models.RoleEnum.MANAGER:
                 mgmt_scores.append(score)
                 
         qoq_trends.append({
