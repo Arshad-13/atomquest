@@ -118,13 +118,22 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
             </select>
             
             <div className="grid grid-cols-3 gap-4">
-              <input type="number" step="any" {...register('target', { valueAsNumber: true, required: true })} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Target" />
-              <select {...register('uom')} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none">
-                <option value="min">Higher is better</option>
-                <option value="max">Lower is better</option>
-                <option value="zero">Zero-based</option>
-              </select>
-              <input type="number" {...register('weightage', { valueAsNumber: true })} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Weightage %" />
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Target Value</label>
+                <input type="number" step="any" {...register('target', { valueAsNumber: true, required: true })} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Target" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Unit of Measure</label>
+                <select {...register('uom')} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none">
+                  <option value="min">Higher is better</option>
+                  <option value="max">Lower is better</option>
+                  <option value="zero">Zero-based</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Weightage %</label>
+                <input type="number" {...register('weightage', { valueAsNumber: true })} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Weightage %" />
+              </div>
             </div>
             
             <textarea {...register('description')} rows={2} className="w-full p-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none" placeholder="Execution Plan / Description" />

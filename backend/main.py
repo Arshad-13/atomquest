@@ -240,13 +240,31 @@ def get_team_goals(manager_id: str, db: Session = Depends(get_db), current_user:
     if current_user.role == models.RoleEnum.MANAGER and current_user.id != manager_id:
         raise HTTPException(status_code=403, detail="Can only view your own team.")
 
-    goals = db.query(models.Goal).join(
-        models.User, models.Goal.owner_id == models.User.id
-    ).filter(
-        models.User.manager_id == manager_id
-    ).all()
+    if current_user.role == models.RoleEnum.ADMIN:
+        goals = db.query(models.Goal).join(
+            models.User, models.Goal.owner_id == models.User.id
+        ).filter(
+            models.User.role != models.RoleEnum.ADMIN
+        ).all()
+    else:
+        goals = db.query(models.Goal).join(
+            models.User, models.Goal.owner_id == models.User.id
+        ).filter(
+            models.User.manager_id == manager_id
+        ).all()
     
     return goals
+
+@app.get("/managers/{manager_id}/team", response_model=List[schemas.UserBasic])
+def get_manager_team(manager_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))):
+    """Fetches all users reporting to this manager. If admin, returns all non-admin users in the system."""
+    if current_user.role == models.RoleEnum.MANAGER and current_user.id != manager_id:
+        raise HTTPException(status_code=403, detail="Can only view your own team.")
+
+    if current_user.role == models.RoleEnum.ADMIN:
+        return db.query(models.User).filter(models.User.role != models.RoleEnum.ADMIN).all()
+        
+    return db.query(models.User).filter(models.User.manager_id == manager_id).all()
 
 @app.post("/goals/{goal_id}/submit", response_model=schemas.GoalResponse)
 def submit_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):

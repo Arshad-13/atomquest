@@ -43,6 +43,7 @@ export const TeamGoalsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all' | 'analytics'>('pending');
   const [rawGoals, setRawGoals] = useState<TeamGoal[]>([]);
+  const [directReports, setDirectReports] = useState<EmployeeBasic[]>([]);
   const [analyticsData, setAnalyticsData] = useState<{ bar_data: any[], heatmap_data: any[] } | null>(null);
   const [expandedEmployees, setExpandedEmployees] = useState<{ [key: string]: boolean }>({});
   
@@ -65,13 +66,15 @@ export const TeamGoalsPage = () => {
   const fetchTeamGoals = async () => {
     if (!user?.id) return;
     try {
-      // Run both fetches in parallel
-      const [teamRes, analyticsRes] = await Promise.all([
+      // Run fetches in parallel
+      const [teamRes, analyticsRes, reportsRes] = await Promise.all([
         apiClient.get(`/managers/${user.id}/team-goals`),
-        apiClient.get(`/managers/${user.id}/analytics`).catch(() => ({ data: null })) // Graceful fail if no data
+        apiClient.get(`/managers/${user.id}/analytics`).catch(() => ({ data: null })), // Graceful fail if no data
+        apiClient.get(`/managers/${user.id}/team`).catch(() => ({ data: [] }))
       ]);
       
       setRawGoals(teamRes.data);
+      setDirectReports(reportsRes.data);
       
       // Inject the analytics data into state if it exists
       if (analyticsRes.data) {
@@ -509,7 +512,7 @@ export const TeamGoalsPage = () => {
       <SharedGoalModal 
         isOpen={sharedModalOpen}
         onClose={() => setSharedModalOpen(false)}
-        employees={directReportsList}
+        employees={directReports.length > 0 ? directReports : directReportsList}
         onGoalCreated={fetchTeamGoals}
       />
     </div>
