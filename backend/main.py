@@ -345,7 +345,16 @@ def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Sessio
         goal.target = updates.target
         
     if updates.weightage is not None and updates.weightage != goal.weightage:
-        # Note: In a real app, you'd re-verify the 100% total rule here too!
+        # Enforce strict 100% total weightage limit validation
+        current_other_weightage = db.query(func.sum(models.Goal.weightage)).filter(
+            models.Goal.owner_id == goal.owner_id,
+            models.Goal.id != goal.id
+        ).scalar() or 0.0
+        if current_other_weightage + updates.weightage > 100.0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rule Violation: Updating this goal's weightage to {updates.weightage}% exceeds the 100% limit for this sheet. Current other goals total: {current_other_weightage}%."
+            )
         changes.append(f"Weightage changed from {goal.weightage} to {updates.weightage}")
         goal.weightage = updates.weightage
         
@@ -833,6 +842,26 @@ def push_shared_goal(
 
     # 2. Fan-out: Clone for each recipient and create the tracking links
     for recipient_id in payload.recipient_ids:
+        # Strict validation: verify recipient exists and is a standard Employee
+        recipient = db.query(models.User).filter(models.User.id == recipient_id).first()
+        if not recipient:
+            raise HTTPException(status_code=404, detail=f"Recipient user '{recipient_id}' not found")
+        if recipient.role != models.RoleEnum.EMPLOYEE:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rule Violation: Pushing tasks is strictly limited to standard Employees. '{recipient.name}' is a '{recipient.role.value}'."
+            )
+
+        # Strict validation: verify that adding this shared goal does not push them over the 100% limit
+        current_weightage = db.query(func.sum(models.Goal.weightage)).filter(
+            models.Goal.owner_id == recipient_id
+        ).scalar() or 0.0
+        if current_weightage + payload.weightage > 100.0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rule Violation: Pushing this shared goal (+{payload.weightage}%) would exceed the 100% limit for '{recipient.name}'. Current total: {current_weightage}%."
+            )
+
         # Create a mirrored draft on the employee's sheet
         emp_goal = models.Goal(
             title=payload.title,
