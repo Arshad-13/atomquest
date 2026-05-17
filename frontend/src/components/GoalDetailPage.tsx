@@ -223,7 +223,7 @@ export const GoalDetailPage = () => {
               <p className="text-sm text-gray-500 italic text-center">No history recorded yet.</p>
             ) : (
               <div className="relative border-l-2 border-gray-200 dark:border-gray-700 ml-3 space-y-8">
-                {history.map((event, index) => (
+                {history.map((event, _index) => (
                   <div key={event.id} className="relative pl-6">
                     {/* Timeline Dot */}
                     <div className={`absolute -left-[9px] top-1 h-4 w-4 rounded-full border-2 border-white dark:border-surface-dark ${

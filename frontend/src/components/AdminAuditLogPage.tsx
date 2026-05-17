@@ -78,7 +78,7 @@ export const AdminAuditLogPage = () => {
 
   // --- CSV Export Logic ---
   const exportCSV = () => {
-    if (filteredLogs.length === 0) return addToast("No data to export.", "warning");
+    if (filteredLogs.length === 0) return addToast("No data to export.", "info");
 
     const headers = ["Timestamp,Goal ID,Goal Title,Employee,Changed By,Change Summary"];
     const csvRows = filteredLogs.map(log => 

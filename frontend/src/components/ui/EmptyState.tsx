@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 export const EmptyState = ({ title, description, icon, action }: { title: string, description: string, icon?: string, action?: ReactNode }) => (
   <div className="flex flex-col items-center justify-center text-center p-12 border-2 border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50/50 dark:bg-gray-900/20">

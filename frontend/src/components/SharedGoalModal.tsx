@@ -13,8 +13,8 @@ interface Employee {
 interface SharedGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  directReports: Employee[];
-  onSuccess: () => void;
+  employees: Employee[];
+  onGoalCreated: () => void;
 }
 
 const THRUST_AREAS = [
@@ -25,7 +25,7 @@ const THRUST_AREAS = [
   "Strategic Growth"
 ];
 
-export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: SharedGoalModalProps) => {
+export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: SharedGoalModalProps) => {
   const { addToast } = useToastStore();
   const [step, setStep] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -33,7 +33,7 @@ export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: S
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [primaryOwner, setPrimaryOwner] = useState<string>("");
 
-  const { register, handleSubmit, formState: { errors }, reset } = useForm({
+  const { register, handleSubmit, reset } = useForm({
     defaultValues: { title: '', description: '', thrust_area: THRUST_AREAS[0], uom: 'min', target: 0, weightage: 10 }
   });
 
@@ -54,11 +54,11 @@ export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: S
   };
 
   const selectAll = () => {
-    if (selectedRecipients.length === directReports.length) {
+    if (selectedRecipients.length === employees.length) {
       setSelectedRecipients([]);
       setPrimaryOwner("");
     } else {
-      setSelectedRecipients(directReports.map(emp => emp.id));
+      setSelectedRecipients(employees.map(emp => emp.id));
     }
   };
 
@@ -80,7 +80,7 @@ export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: S
         primary_owner_id: primaryOwner
       });
       addToast("Shared Goal successfully cascaded to team.", "success");
-      onSuccess();
+      onGoalCreated();
       handleClose();
     } catch (err) {
       addToast("Failed to push shared goal.", "error");
@@ -137,12 +137,12 @@ export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: S
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-gray-900 dark:text-white">Step 2: Select Recipients</h3>
               <button type="button" onClick={selectAll} className="text-xs text-primary-600 hover:text-primary-700 font-medium">
-                {selectedRecipients.length === directReports.length ? 'Deselect All' : 'Select All'}
+                {selectedRecipients.length === employees.length ? 'Deselect All' : 'Select All'}
               </button>
             </div>
             
             <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
-              {directReports.map(emp => (
+              {employees.map(emp => (
                 <label key={emp.id} className="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer">
                   <input 
                     type="checkbox" 
@@ -169,7 +169,7 @@ export const SharedGoalModal = ({ isOpen, onClose, directReports, onSuccess }: S
               className="w-full p-2.5 text-sm rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent focus:ring-2 focus:ring-primary-500 outline-none"
             >
               <option value="" disabled>Select Owner...</option>
-              {directReports.filter(emp => selectedRecipients.includes(emp.id)).map(emp => (
+              {employees.filter(emp => selectedRecipients.includes(emp.id)).map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.name}</option>
               ))}
             </select>

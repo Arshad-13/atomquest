@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { Link } from 'react-router-dom';
 

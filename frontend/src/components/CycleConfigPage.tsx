@@ -25,7 +25,7 @@ const PERIODS = [
 ];
 
 export const CycleConfigPage = () => {
-  const { user } = useAppStore();
+  const { user: _user } = useAppStore();
   const { addToast } = useToastStore();
 
   const [loading, setLoading] = useState(true);

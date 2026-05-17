@@ -3,6 +3,7 @@ import { apiClient } from '../api/client';
 import { useToastStore } from '../store/useToastStore';
 import { Card } from './ui/Card';
 import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
 

@@ -41,7 +41,7 @@ export const TeamGoalsPage = () => {
   const { addToast } = useToastStore();
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all' | 'analytics'>('pending');
   const [rawGoals, setRawGoals] = useState<TeamGoal[]>([]);
   const [analyticsData, setAnalyticsData] = useState<{ bar_data: any[], heatmap_data: any[] } | null>(null);
   const [expandedEmployees, setExpandedEmployees] = useState<{ [key: string]: boolean }>({});
@@ -117,7 +117,7 @@ export const TeamGoalsPage = () => {
 
   // --- Core Workflows ---
 
-  const handleApproveSheet = async (employeeId: string, goals: TeamGoal[]) => {
+  const handleApproveSheet = async (_employeeId: string, goals: TeamGoal[]) => {
     setSubmittingAction(true);
     try {
       // Calculate total allocated weightage including current inline edits
