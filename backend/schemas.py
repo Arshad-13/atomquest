@@ -1,7 +1,17 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from models import UoMEnum, StatusEnum, QuarterEnum
+from models import UoMEnum, StatusEnum, QuarterEnum, RoleEnum
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: RoleEnum
+    manager_id: Optional[str] = None
+
+class ResetPasswordRequest(BaseModel):
+    password: str
 
 class GoalBase(BaseModel):
     thrust_area: str
@@ -52,6 +62,19 @@ class UserBasicWithWeightage(BaseModel):
     role: str
     total_weightage: float
     is_locked: bool
+
+    class Config:
+        from_attributes = True
+
+class UserDirectoryResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str
+    total_weightage: float
+    is_locked: bool
+    manager_id: Optional[str] = None
+    manager_name: Optional[str] = None
 
     class Config:
         from_attributes = True

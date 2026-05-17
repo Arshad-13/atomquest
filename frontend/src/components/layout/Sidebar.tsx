@@ -34,7 +34,8 @@ export const Sidebar = () => {
       { label: 'Reports', path: '/admin/reports', roles: ['admin'] },
       { label: 'Escalation Rules', path: '/admin/escalation', roles: ['admin'] },
       { label: 'Overrides', path: '/admin/overrides', roles: ['admin'] },
-      { label: 'Audit Log', path: '/admin/audit', roles: ['admin'] }
+      { label: 'Audit Log', path: '/admin/audit', roles: ['admin'] },
+      { label: 'Employee Directory', path: '/admin/users', roles: ['admin'] }
     );
   }
 

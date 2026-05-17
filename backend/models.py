@@ -82,7 +82,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=False)
+    goal_id = Column(Integer, ForeignKey("goals.id"), nullable=True)
     changed_by = Column(String, ForeignKey("users.id"), nullable=False)
     change_summary = Column(Text, nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())

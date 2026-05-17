@@ -25,6 +25,7 @@ import { AdminAuditLogPage } from './components/AdminAuditLogPage';
 import { ReportsPage } from './components/ReportsPage';
 import { AdminAnalyticsPage } from './components/AdminAnalyticsPage';
 import { AdminEscalationPage } from './components/AdminEscalationPage';
+import { AdminUsersPage } from './components/AdminUsersPage';
 
 function App() {
   const { user, token, setAuth, logout } = useAppStore();
@@ -110,6 +111,11 @@ function App() {
             <Route path="/admin/escalation" element={
               <RoleGate allowedRoles={['admin']}>
                 <AdminEscalationPage />
+              </RoleGate>
+            } />
+            <Route path="/admin/users" element={
+              <RoleGate allowedRoles={['admin']}>
+                <AdminUsersPage />
               </RoleGate>
             } />
           </Route>

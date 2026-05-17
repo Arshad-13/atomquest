@@ -17,6 +17,8 @@ import models
 import schemas
 from auth.dependencies import get_current_user, require_role
 from auth.router import router as auth_router
+import uuid
+from auth.security import get_password_hash
 
 app = FastAPI()
 app.include_router(auth_router)
@@ -1080,6 +1082,97 @@ def cancel_shared_goal(
     
     db.commit()
     return {"message": "Shared goal successfully canceled and cleaned up across all sheets."}
+
+@app.get("/admin/users", response_model=List[schemas.UserDirectoryResponse])
+def get_all_users_directory(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
+    """Admin route to fetch all users in the system, manager names, and sheet stats."""
+    users = db.query(models.User).order_by(models.User.name).all()
+    results = []
+    for u in users:
+        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id).scalar() or 0.0
+        locked = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.is_locked == True).count() > 0
+        mgr_name = None
+        if u.manager_id:
+            mgr = db.query(models.User).filter(models.User.id == u.manager_id).first()
+            if mgr:
+                mgr_name = mgr.name
+                
+        results.append(schemas.UserDirectoryResponse(
+            id=u.id,
+            name=u.name,
+            email=u.email,
+            role=u.role.value,
+            total_weightage=float(total_w),
+            is_locked=bool(locked),
+            manager_id=u.manager_id,
+            manager_name=mgr_name
+        ))
+    return results
+
+@app.post("/admin/users")
+def provision_new_user(
+    payload: schemas.UserCreate, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))
+):
+    """HR Admin route to manually provision a new employee, manager, or admin."""
+    existing = db.query(models.User).filter(models.User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="An employee with this email address is already registered.")
+        
+    hashed = get_password_hash(payload.password)
+    user_uuid = f"usr-{uuid.uuid4().hex[:12]}"
+    
+    new_user = models.User(
+        id=user_uuid,
+        name=payload.name,
+        email=payload.email,
+        hashed_password=hashed,
+        role=payload.role,
+        manager_id=payload.manager_id
+    )
+    db.add(new_user)
+    db.flush()
+    
+    audit_entry = models.AuditLog(
+        goal_id=None,
+        changed_by=current_user.id,
+        change_summary=f"EMPLOYEE PROVISIONED: Created new local account for {payload.name} ({payload.role.value}) reporting to manager ID: {payload.manager_id}."
+    )
+    db.add(audit_entry)
+    
+    db.commit()
+    return {"message": f"Employee {payload.name} successfully registered in system.", "id": user_uuid}
+
+@app.post("/admin/users/{user_id}/reset-password")
+def admin_reset_user_password(
+    user_id: str,
+    payload: schemas.ResetPasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))
+):
+    """HR Admin route to force reset an employee's local login password."""
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Employee not found.")
+        
+    # Hash password securely
+    hashed = get_password_hash(payload.password)
+    user.hashed_password = hashed
+    
+    # Audit trail stamp
+    audit_entry = models.AuditLog(
+        goal_id=None,
+        changed_by=current_user.id,
+        change_summary=f"ADMIN OVERRIDE (PASSWORD RESET): Force reset login credentials for {user.name} ({user.email})."
+    )
+    db.add(audit_entry)
+    db.commit()
+    
+    return {"message": f"Password successfully reset for {user.name}."}
 
 @app.get("/reports/achievement")
 def get_achievement_report(
