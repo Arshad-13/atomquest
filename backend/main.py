@@ -1063,7 +1063,7 @@ def get_employee_analytics(
             # Shorten title for the chart legend
             short_title = g.title[:15] + "..." if len(g.title) > 15 else g.title
             # Find the check-in for this specific quarter
-            ci = next((c for c in checkins if c.goal_id == g.id and c.quarter == q), None)
+            ci = next((c for c in checkins if c.goal_id == g.id and c.quarter.value == q), None)
             
             if ci:
                 # Assuming you have a progress score calculator function
@@ -1082,7 +1082,7 @@ def get_employee_analytics(
         # Get the latest check-in for this goal
         g_checkins = [c for c in checkins if c.goal_id == g.id]
         if g_checkins:
-            latest_ci = sorted(g_checkins, key=lambda x: x.quarter)[-1]
+            latest_ci = sorted(g_checkins, key=lambda x: x.quarter.value)[-1]
             score = calculate_progress_score(latest_ci.actual_achievement, g.target, g.uom)
             thrust_areas[g.thrust_area].append(score)
         else:
@@ -1133,7 +1133,7 @@ def get_admin_executive_analytics(
         eng_scores = []
         mgmt_scores = []
         
-        q_checkins = [c for c in checkins if c.quarter == q]
+        q_checkins = [c for c in checkins if c.quarter.value == q]
         for c in q_checkins:
             goal = db.query(models.Goal).filter(models.Goal.id == c.goal_id).first()
             if not goal:
