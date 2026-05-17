@@ -324,9 +324,9 @@ def get_goal_history(goal_id: int, db: Session = Depends(get_db), current_user: 
     return history
 
 @app.patch("/goals/{goal_id}", response_model=schemas.GoalResponse)
-def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))):
+def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
-    Allows managers to edit targets inline or approve (lock) the goal.
+    Allows employees to edit draft/returned goals and managers to edit targets inline or approve (lock) the goal.
     Automatically generates an Audit Trail log.
     """
     goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
@@ -334,12 +334,35 @@ def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Sessio
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
         
+    # Check permissions
+    if current_user.role == models.RoleEnum.EMPLOYEE:
+        if goal.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Employees can only modify their own goals.")
+        if updates.is_locked is not None:
+            raise HTTPException(status_code=403, detail="Employees cannot lock or approve goals.")
+            
     if goal.is_locked:
         raise HTTPException(status_code=400, detail="Goal is already locked. Admin intervention required.")
 
     # Track what changed for the Audit Log
     changes = []
     
+    if updates.thrust_area is not None and updates.thrust_area != goal.thrust_area:
+        changes.append(f"Thrust area changed: {goal.thrust_area} -> {updates.thrust_area}")
+        goal.thrust_area = updates.thrust_area
+
+    if updates.title is not None and updates.title != goal.title:
+        changes.append(f"Title changed: '{goal.title}' -> '{updates.title}'")
+        goal.title = updates.title
+
+    if updates.description is not None and updates.description != goal.description:
+        changes.append("Description updated.")
+        goal.description = updates.description
+
+    if updates.uom is not None and updates.uom != goal.uom:
+        changes.append(f"UoM changed: {goal.uom} -> {updates.uom}")
+        goal.uom = models.UoMEnum(updates.uom)
+
     if updates.target is not None and updates.target != goal.target:
         changes.append(f"Target changed from {goal.target} to {updates.target}")
         goal.target = updates.target
@@ -373,9 +396,10 @@ def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Sessio
 
     # If changes were made, write to the Audit Trail
     if changes:
+        changed_by_user = updates.manager_id if (updates.manager_id and current_user.role != models.RoleEnum.EMPLOYEE) else current_user.id
         audit_entry = models.AuditLog(
             goal_id=goal.id,
-            changed_by=updates.manager_id,
+            changed_by=changed_by_user,
             change_summary=" | ".join(changes)
         )
         db.add(audit_entry)

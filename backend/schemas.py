@@ -83,10 +83,14 @@ class TeamGoalResponse(GoalResponse):
     owner: UserBasic  
 
 class GoalUpdate(BaseModel):
+    thrust_area: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    uom: Optional[UoMEnum] = None
     target: Optional[float] = None
     weightage: Optional[float] = None
     is_locked: Optional[bool] = None
-    manager_id: str 
+    manager_id: Optional[str] = None
     
 class CheckInBase(BaseModel):
     quarter: QuarterEnum
