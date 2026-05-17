@@ -191,9 +191,9 @@ def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = De
         Employee.name.label("employee_name"),
         Changer.name.label("changed_by_name"),
         models.AuditLog.change_summary
-    ).join(
+    ).outerjoin(
         models.Goal, models.AuditLog.goal_id == models.Goal.id
-    ).join(
+    ).outerjoin(
         Employee, models.Goal.owner_id == Employee.id
     ).join(
         Changer, models.AuditLog.changed_by == Changer.id

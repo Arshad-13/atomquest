@@ -228,9 +228,9 @@ class AdminUnlockRequest(BaseModel):
 class AdminAuditLogResponse(BaseModel):
     id: int
     timestamp: datetime
-    goal_id: int
-    goal_title: str
-    employee_name: str
+    goal_id: Optional[int] = None
+    goal_title: Optional[str] = None
+    employee_name: Optional[str] = None
     changed_by_name: str
     change_summary: str
 

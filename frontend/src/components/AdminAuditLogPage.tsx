@@ -10,9 +10,9 @@ import { EmptyState } from './ui/EmptyState';
 interface AuditLog {
   id: number;
   timestamp: string;
-  goal_id: number;
-  goal_title: string;
-  employee_name: string;
+  goal_id: number | null;
+  goal_title: string | null;
+  employee_name: string | null;
   changed_by_name: string;
   change_summary: string;
 }
@@ -52,13 +52,18 @@ export const AdminAuditLogPage = () => {
   // --- Filter Logic ---
   const filteredLogs = logs.filter(log => {
     // 1. Employee Search
-    if (searchEmployee && !log.employee_name.toLowerCase().includes(searchEmployee.toLowerCase()) && !log.changed_by_name.toLowerCase().includes(searchEmployee.toLowerCase())) return false;
+    const employeeMatch = !searchEmployee || 
+      (log.employee_name && log.employee_name.toLowerCase().includes(searchEmployee.toLowerCase())) || 
+      log.changed_by_name.toLowerCase().includes(searchEmployee.toLowerCase());
+      
+    if (!employeeMatch) return false;
     
     // 2. Action Type Matcher
     if (filterAction !== 'All') {
       if (filterAction === 'APPROVED' && !log.change_summary.includes('APPROVED')) return false;
-      if (filterAction === 'OVERRIDE' && !log.change_summary.includes('OVERRIDE')) return false;
-      if (filterAction === 'EDIT' && log.change_summary.includes('APPROVED')) return false; // Basic edits don't have the approval stamp
+      if (filterAction === 'OVERRIDE' && !log.change_summary.includes('OVERRIDE') && !log.change_summary.includes('PASSWORD RESET')) return false;
+      if (filterAction === 'PROVISION' && !log.change_summary.includes('EMPLOYEE PROVISIONED')) return false;
+      if (filterAction === 'EDIT' && (log.change_summary.includes('APPROVED') || log.change_summary.includes('EMPLOYEE PROVISIONED') || log.change_summary.includes('PASSWORD RESET'))) return false;
     }
 
     // 3. Date Range
@@ -82,7 +87,7 @@ export const AdminAuditLogPage = () => {
 
     const headers = ["Timestamp,Goal ID,Goal Title,Employee,Changed By,Change Summary"];
     const csvRows = filteredLogs.map(log => 
-      `"${new Date(log.timestamp).toLocaleString()}","${log.goal_id}","${log.goal_title}","${log.employee_name}","${log.changed_by_name}","${log.change_summary.replace(/"/g, '""')}"`
+      `"${new Date(log.timestamp).toLocaleString()}","${log.goal_id ?? ''}","${log.goal_title ?? ''}","${log.employee_name ?? ''}","${log.changed_by_name}","${log.change_summary.replace(/"/g, '""')}"`
     );
     
     const csvString = [headers, ...csvRows].join('\n');
@@ -100,8 +105,9 @@ export const AdminAuditLogPage = () => {
 
   // Helper to parse action tags for styling
   const getActionBadge = (summary: string) => {
-    if (summary.includes("OVERRIDE")) return <Badge variant="danger">System Override</Badge>;
+    if (summary.includes("OVERRIDE") || summary.includes("PASSWORD RESET")) return <Badge variant="danger">System Override</Badge>;
     if (summary.includes("APPROVED")) return <Badge variant="success">Authorization</Badge>;
+    if (summary.includes("EMPLOYEE PROVISIONED")) return <Badge variant="success">Provisioning</Badge>;
     return <Badge variant="info">Modification</Badge>;
   };
 
@@ -143,6 +149,7 @@ export const AdminAuditLogPage = () => {
           >
             <option value="All">All Actions</option>
             <option value="APPROVED">Authorizations</option>
+            <option value="PROVISION">Provisioning</option>
             <option value="EDIT">Modifications</option>
             <option value="OVERRIDE">System Overrides</option>
           </select>
@@ -195,12 +202,22 @@ export const AdminAuditLogPage = () => {
                     </td>
 
                     <td className="p-4 max-w-xs">
-                      <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{log.goal_title}</p>
-                      <p className="text-xs text-gray-500 font-mono mt-0.5">Goal ID: #{log.goal_id}</p>
+                      {log.goal_id ? (
+                        <>
+                          <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm truncate">{log.goal_title}</p>
+                          <p className="text-xs text-gray-500 font-mono mt-0.5">Goal ID: #{log.goal_id}</p>
+                        </>
+                      ) : (
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-800/60 px-2.5 py-1 rounded">
+                          ⚙️ System Event
+                        </span>
+                      )}
                     </td>
 
                     <td className="p-4">
-                      <p className="text-sm text-gray-900 dark:text-gray-100"><span className="text-gray-500 text-xs w-12 inline-block">Owner:</span> {log.employee_name}</p>
+                      {log.employee_name && (
+                        <p className="text-sm text-gray-900 dark:text-gray-100"><span className="text-gray-500 text-xs w-12 inline-block">Owner:</span> {log.employee_name}</p>
+                      )}
                       <p className="text-sm text-gray-900 dark:text-gray-100 mt-0.5"><span className="text-gray-500 text-xs w-12 inline-block">Actor:</span> {log.changed_by_name}</p>
                     </td>
 
