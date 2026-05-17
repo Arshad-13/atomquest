@@ -594,24 +594,8 @@ def activate_cycle_window(cycle_id: int, db: Session = Depends(get_db), current_
 # NOTE: GET /admin/completion-dashboard is defined below with the full AdminCompletionRow schema.
 # This weaker stub has been removed to eliminate the duplicate route conflict.
 
-@app.post("/admin/goals/{goal_id}/unlock")
-def unlock_goal(goal_id: int, req: schemas.UnlockRequest, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
-    """Sets is_locked = False on a goal and logs an audit trail."""
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
-    if not goal:
-        raise HTTPException(status_code=404, detail="Goal not found")
-        
-    goal.is_locked = False
-    goal.status = "returned"
-    
-    audit = models.AuditLog(
-        goal_id=goal.id,
-        changed_by=current_user.id,
-        change_summary=f"Admin unlocked goal: {req.reason}"
-    )
-    db.add(audit)
-    db.commit()
-    return {"detail": "Goal unlocked"}
+# NOTE: POST /admin/goals/{goal_id}/unlock has been consolidated below with the full force-unlock overrides pipeline to avoid route conflicts.
+
 
 @app.post("/goals/{goal_id}/approve")
 def approve_goal(
