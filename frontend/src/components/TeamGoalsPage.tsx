@@ -232,7 +232,6 @@ export const TeamGoalsPage = () => {
           <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Team Goal Management</h2>
           <p className="text-gray-500 dark:text-gray-400 mt-1">Review performance parameters, alter weightages inline, and approve sheets for your team.</p>
         </div>
-        <Button onClick={() => setSharedModalOpen(true)} variant="primary">Create Shared Goal</Button>
       </div>
 
       {/* Tabs Control Panel & Shared Goal Button */}
