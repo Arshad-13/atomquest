@@ -255,16 +255,32 @@ def get_team_goals(manager_id: str, db: Session = Depends(get_db), current_user:
     
     return goals
 
-@app.get("/managers/{manager_id}/team", response_model=List[schemas.UserBasic])
+@app.get("/managers/{manager_id}/team", response_model=List[schemas.UserBasicWithWeightage])
 def get_manager_team(manager_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))):
     """Fetches all users reporting to this manager. If admin, returns all non-admin users in the system."""
     if current_user.role == models.RoleEnum.MANAGER and current_user.id != manager_id:
         raise HTTPException(status_code=403, detail="Can only view your own team.")
 
     if current_user.role == models.RoleEnum.ADMIN:
-        return db.query(models.User).filter(models.User.role != models.RoleEnum.ADMIN).all()
+        users = db.query(models.User).filter(models.User.role != models.RoleEnum.ADMIN).all()
+    else:
+        users = db.query(models.User).filter(models.User.manager_id == manager_id).all()
         
-    return db.query(models.User).filter(models.User.manager_id == manager_id).all()
+    results = []
+    for u in users:
+        # Calculate sum of weightages
+        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id).scalar() or 0.0
+        # Determine if locked
+        locked = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.is_locked == True).count() > 0
+        results.append(schemas.UserBasicWithWeightage(
+            id=u.id,
+            name=u.name,
+            role=u.role.value,
+            total_weightage=float(total_w),
+            is_locked=bool(locked)
+        ))
+        
+    return results
 
 @app.post("/goals/{goal_id}/submit", response_model=schemas.GoalResponse)
 def submit_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -846,6 +862,28 @@ def push_shared_goal(
         db.add(emp_goal)
         db.flush()
         
+        # Check if recipient has locked goals. If they do, unlock all their goals so they can rebalance!
+        has_locked_goals = db.query(models.Goal).filter(
+            models.Goal.owner_id == recipient_id,
+            models.Goal.is_locked == True
+        ).count() > 0
+        
+        if has_locked_goals:
+            db.query(models.Goal).filter(
+                models.Goal.owner_id == recipient_id
+            ).update({
+                models.Goal.is_locked: False,
+                models.Goal.status: "draft"
+            }, synchronize_session=False)
+            
+            # Log this override in the Audit Log
+            audit_entry = models.AuditLog(
+                goal_id=emp_goal.id,
+                changed_by=current_user.id,
+                change_summary=f"SHARED GOAL CASCADED: Auto-unlocked sheet for weightage balancing (+{payload.weightage}% added)"
+            )
+            db.add(audit_entry)
+        
         # Link them together using the Phase 2 architecture
         link = models.SharedGoalLink(
             base_goal_id=base_goal.id,
@@ -973,6 +1011,75 @@ def admin_unlock_goal(
     db.commit()
 
     return {"message": "Goal successfully unlocked and audit log updated."}
+
+@app.get("/admin/shared-goals")
+def get_all_shared_goals(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Fetch all pushed shared goals in the system."""
+    if current_user.role != models.RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="System Admin access required.")
+        
+    shared_goals = db.query(models.Goal).filter(models.Goal.title.like("[SHARED]%")).all()
+    results = []
+    for sg in shared_goals:
+        links = db.query(models.SharedGoalLink).filter(models.SharedGoalLink.base_goal_id == sg.id).all()
+        recipients = []
+        for l in links:
+            rec = db.query(models.User).filter(models.User.id == l.recipient_id).first()
+            if rec:
+                recipients.append({"id": rec.id, "name": rec.name})
+        results.append({
+            "id": sg.id,
+            "title": sg.title,
+            "description": sg.description,
+            "thrust_area": sg.thrust_area,
+            "weightage": sg.weightage,
+            "recipients": recipients
+        })
+    return results
+
+@app.post("/admin/shared-goals/{base_goal_id}/cancel")
+def cancel_shared_goal(
+    base_goal_id: int, 
+    payload: schemas.AdminUnlockRequest, 
+    db: Session = Depends(get_db), 
+    current_user: models.User = Depends(get_current_user)
+):
+    """Cancel (delete) a shared goal, cascading deletion to all mirrored employee goals and links."""
+    if current_user.role != models.RoleEnum.ADMIN:
+        raise HTTPException(status_code=403, detail="System Admin access required.")
+        
+    base_goal = db.query(models.Goal).filter(models.Goal.id == base_goal_id).first()
+    if not base_goal:
+        raise HTTPException(status_code=404, detail="Shared goal not found")
+        
+    links = db.query(models.SharedGoalLink).filter(models.SharedGoalLink.base_goal_id == base_goal_id).all()
+    recipient_ids = [l.recipient_id for l in links]
+    
+    title_clean = base_goal.title.replace("[SHARED] ", "")
+    mirrored_goals = db.query(models.Goal).filter(
+        models.Goal.owner_id.in_(recipient_ids),
+        models.Goal.title == title_clean
+    ).all()
+    
+    for mg in mirrored_goals:
+        audit_entry = models.AuditLog(
+            goal_id=mg.id,
+            changed_by=current_user.id,
+            change_summary=f"SHARED GOAL CANCELED BY ADMIN: {payload.reason}"
+        )
+        db.add(audit_entry)
+        
+        db.query(models.CheckIn).filter(models.CheckIn.goal_id == mg.id).delete()
+        db.query(models.ApprovalRequest).filter(models.ApprovalRequest.goal_id == mg.id).delete()
+        db.delete(mg)
+        
+    db.query(models.SharedGoalLink).filter(models.SharedGoalLink.base_goal_id == base_goal_id).delete()
+    db.query(models.CheckIn).filter(models.CheckIn.goal_id == base_goal.id).delete()
+    db.query(models.ApprovalRequest).filter(models.ApprovalRequest.goal_id == base_goal.id).delete()
+    db.delete(base_goal)
+    
+    db.commit()
+    return {"message": "Shared goal successfully canceled and cleaned up across all sheets."}
 
 @app.get("/reports/achievement")
 def get_achievement_report(

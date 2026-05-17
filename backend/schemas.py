@@ -46,6 +46,16 @@ class UserBasic(BaseModel):
     class Config:
         from_attributes = True
 
+class UserBasicWithWeightage(BaseModel):
+    id: str
+    name: str
+    role: str
+    total_weightage: float
+    is_locked: bool
+
+    class Config:
+        from_attributes = True
+
 class TeamGoalResponse(GoalResponse):
     owner: UserBasic  
 

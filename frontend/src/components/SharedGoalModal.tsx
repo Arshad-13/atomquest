@@ -8,6 +8,9 @@ import { Button } from './ui/Button';
 interface Employee {
   id: string;
   name: string;
+  role: string;
+  total_weightage: number;
+  is_locked: boolean;
 }
 
 interface SharedGoalModalProps {
@@ -33,14 +36,22 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
   const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [primaryOwner, setPrimaryOwner] = useState<string>("");
 
-  const { register, handleSubmit, reset } = useForm({
+  // Step 2 Filters
+  const [roleFilter, setRoleFilter] = useState<'all' | 'employee' | 'manager'>('all');
+  const [feasibilityFilter, setFeasibilityFilter] = useState<'all' | 'fits' | 'exceeds'>('all');
+
+  const { register, handleSubmit, reset, watch } = useForm({
     defaultValues: { title: '', description: '', thrust_area: THRUST_AREAS[0], uom: 'min', target: 0, weightage: 10 }
   });
+
+  const currentGoalWeightage = watch('weightage') || 0;
 
   const handleClose = () => {
     setStep(1);
     setSelectedRecipients([]);
     setPrimaryOwner("");
+    setRoleFilter('all');
+    setFeasibilityFilter('all');
     reset();
     onClose();
   };
@@ -54,16 +65,25 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
   };
 
   const selectAll = () => {
-    if (selectedRecipients.length === employees.length) {
-      setSelectedRecipients([]);
+    if (selectedRecipients.length === filteredEmployeesList.length) {
+      // Clear only those in the current filtered list
+      setSelectedRecipients(prev => prev.filter(id => !filteredEmployeesList.some(emp => emp.id === id)));
       setPrimaryOwner("");
     } else {
-      setSelectedRecipients(employees.map(emp => emp.id));
+      // Add all from current filtered list
+      setSelectedRecipients(prev => {
+        const unique = new Set([...prev, ...filteredEmployeesList.map(emp => emp.id)]);
+        return Array.from(unique);
+      });
     }
   };
 
   const onSubmitForm = async (data: any) => {
-    if (step === 1) return setStep(2);
+    if (step === 1) {
+      if (!data.title) return addToast("Shared goal title is required.", "error");
+      if (data.weightage <= 0) return addToast("Weightage must be greater than 0%.", "error");
+      return setStep(2);
+    }
     if (step === 2) {
       if (selectedRecipients.length === 0) return addToast("Select at least one recipient.", "error");
       return setStep(3);
@@ -88,6 +108,20 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
       setSubmitting(false);
     }
   };
+
+  // Compute list based on filters
+  const filteredEmployeesList = employees.filter(emp => {
+    // 1. Role Filter
+    if (roleFilter !== 'all' && emp.role !== roleFilter) return false;
+
+    // 2. Feasibility Filter
+    const newTotal = emp.total_weightage + currentGoalWeightage;
+    const fits = newTotal <= 100;
+    if (feasibilityFilter === 'fits' && !fits) return false;
+    if (feasibilityFilter === 'exceeds' && fits) return false;
+
+    return true;
+  });
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Push Shared Goal">
@@ -146,22 +180,119 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
             <div className="flex justify-between items-center">
               <h3 className="font-semibold text-gray-900 dark:text-white">Step 2: Select Recipients</h3>
               <button type="button" onClick={selectAll} className="text-xs text-primary-600 hover:text-primary-700 font-medium">
-                {selectedRecipients.length === employees.length ? 'Deselect All' : 'Select All'}
+                {selectedRecipients.length === filteredEmployeesList.length ? 'Deselect All Filtered' : 'Select All Filtered'}
+              </button>
+            </div>
+
+            {/* Role Filter Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-gray-800">
+              <button 
+                type="button" 
+                onClick={() => setRoleFilter('all')} 
+                className={`py-2 px-4 text-xs font-semibold border-b-2 transition-colors ${
+                  roleFilter === 'all' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-400'
+                }`}
+              >
+                All Roles ({employees.length})
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setRoleFilter('employee')} 
+                className={`py-2 px-4 text-xs font-semibold border-b-2 transition-colors ${
+                  roleFilter === 'employee' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-400'
+                }`}
+              >
+                Employees ({employees.filter(e => e.role === 'employee').length})
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setRoleFilter('manager')} 
+                className={`py-2 px-4 text-xs font-semibold border-b-2 transition-colors ${
+                  roleFilter === 'manager' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-400'
+                }`}
+              >
+                Managers ({employees.filter(e => e.role === 'manager').length})
+              </button>
+            </div>
+
+            {/* Feasibility Filter Pills */}
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={() => setFeasibilityFilter('all')} 
+                className={`text-[10px] px-2.5 py-1 font-bold rounded-full border transition-all ${
+                  feasibilityFilter === 'all' 
+                    ? 'bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200' 
+                    : 'bg-transparent border-transparent text-gray-400 hover:text-gray-600'
+                }`}
+              >
+                All Availability
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setFeasibilityFilter('fits')} 
+                className={`text-[10px] px-2.5 py-1 font-bold rounded-full border transition-all ${
+                  feasibilityFilter === 'fits' 
+                    ? 'bg-green-50 border-green-200 text-green-700 dark:bg-green-900/20 dark:border-green-800' 
+                    : 'bg-transparent border-transparent text-gray-400 hover:text-green-500'
+                }`}
+              >
+                Fits Perfectly (Total &lt;= 100%)
+              </button>
+              <button 
+                type="button" 
+                onClick={() => setFeasibilityFilter('exceeds')} 
+                className={`text-[10px] px-2.5 py-1 font-bold rounded-full border transition-all ${
+                  feasibilityFilter === 'exceeds' 
+                    ? 'bg-amber-50 border-amber-200 text-amber-700 dark:bg-amber-900/20 dark:border-amber-800' 
+                    : 'bg-transparent border-transparent text-gray-400 hover:text-amber-500'
+                }`}
+              >
+                Auto-Unlocks Sheet (Total &gt; 100%)
               </button>
             </div>
             
-            <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800">
-              {employees.map(emp => (
-                <label key={emp.id} className="flex items-center p-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={selectedRecipients.includes(emp.id)}
-                    onChange={() => toggleRecipient(emp.id)}
-                    className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
-                  />
-                  <span className="ml-3 text-sm font-medium text-gray-900 dark:text-gray-200">{emp.name}</span>
-                </label>
-              ))}
+            <div className="max-h-60 overflow-y-auto border border-gray-200 dark:border-gray-800 rounded-lg divide-y divide-gray-100 dark:divide-gray-800 bg-white dark:bg-surface-dark">
+              {filteredEmployeesList.length === 0 ? (
+                <div className="p-6 text-center text-xs text-gray-400">No employees match these filters.</div>
+              ) : (
+                filteredEmployeesList.map(emp => {
+                  const newTotal = emp.total_weightage + currentGoalWeightage;
+                  const fits = newTotal <= 100;
+                  
+                  return (
+                    <label key={emp.id} className="flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 cursor-pointer">
+                      <div className="flex items-center min-w-0 mr-4">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedRecipients.includes(emp.id)}
+                          onChange={() => toggleRecipient(emp.id)}
+                          className="w-4 h-4 text-primary-600 rounded border-gray-300 focus:ring-primary-500"
+                        />
+                        <div className="ml-3 min-w-0">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-gray-200 truncate">{emp.name}</p>
+                          <span className="inline-block mt-0.5 text-[9px] uppercase tracking-wider font-bold text-primary-500">
+                            {emp.role}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                          Allocated: {emp.total_weightage}%
+                        </p>
+                        <span className={`inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          fits 
+                            ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                            : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                        }`}>
+                          {fits ? `Fits (${newTotal}%)` : `Unlocks Sheet (${newTotal}%)`}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })
+              )}
             </div>
           </div>
         )}
