@@ -2,7 +2,7 @@
 
 AtomQuest is a lightweight goal-setting and performance tracking application built with a FastAPI backend and a React + Vite TypeScript frontend. It provides role-based access controls (RBAC), goal lifecycle management, check-ins, and manager analytics suitable for small teams and internal HR workflows.
 
-![Architecture diagram](@file:image.png)
+![Architecture diagram](@file:image.svg)
 
 ## Key Features
 - Role-based access control: Employee, Manager, Admin

@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="600" viewBox="0 0 1200 600">
+  <style>
+    .box { fill:#ffffff; stroke:#2b6cb0; stroke-width:2; rx:8; }
+    .text { font-family: Inter, Arial, sans-serif; fill:#0f172a; font-size:16px; }
+    .title { font-size:20px; font-weight:700; }
+    .arrow { stroke:#4a5568; stroke-width:2; fill:none; marker-end: url(#arrowhead); }
+  </style>
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#4a5568" />
+    </marker>
+  </defs>
+
+  <!-- Frontend -->
+  <rect x="40" y="80" width="260" height="110" class="box" />
+  <text x="170" y="110" text-anchor="middle" class="text title">Frontend (React + Vite)</text>
+  <text x="170" y="135" text-anchor="middle" class="text">User UI, Auth, Charts</text>
+
+  <!-- CDN / Browser -->
+  <rect x="40" y="220" width="260" height="60" class="box" />
+  <text x="170" y="255" text-anchor="middle" class="text">Static CDN / Browser Cache</text>
+
+  <!-- Backend -->
+  <rect x="430" y="60" width="360" height="160" class="box" />
+  <text x="610" y="90" text-anchor="middle" class="text title">Backend (FastAPI)</text>
+  <text x="610" y="115" text-anchor="middle" class="text">API, RBAC, Business Logic</text>
+  <text x="610" y="140" text-anchor="middle" class="text">JWT Auth, Audit, Analytics</text>
+
+  <!-- DB -->
+  <rect x="860" y="60" width="260" height="110" class="box" />
+  <text x="990" y="90" text-anchor="middle" class="text title">Database</text>
+  <text x="990" y="115" text-anchor="middle" class="text">Postgres (prod) / SQLite (dev)</text>
+
+  <!-- Arrows -->
+  <path d="M300 135 L430 135" class="arrow" />
+  <path d="M790 135 L860 115" class="arrow" />
+  <path d="M860 170 L790 170 L610 170" class="arrow" />
+
+  <!-- Manager / Admin Tools -->
+  <rect x="430" y="240" width="360" height="100" class="box" />
+  <text x="610" y="270" text-anchor="middle" class="text title">Admin / Manager Services</text>
+  <text x="610" y="295" text-anchor="middle" class="text">Analytics, Overrides, Audits</text>
+
+  <path d="M610 220 L610 240" class="arrow" />
+
+  <!-- Footer -->
+  <text x="600" y="560" text-anchor="middle" class="text">Architecture: Frontend → Backend → Database. Admin tools connect to backend.</text>
+</svg>
