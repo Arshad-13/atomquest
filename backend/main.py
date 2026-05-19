@@ -20,6 +20,8 @@ from auth.router import router as auth_router
 import uuid
 from auth.security import get_password_hash
 from dotenv import load_dotenv
+from sqlalchemy import inspect, text
+import database as _database
 
 load_dotenv()
 
@@ -28,6 +30,44 @@ APP_ENV = os.getenv("APP_ENV", "development")
 
 app = FastAPI()
 app.include_router(auth_router)
+
+
+@app.on_event("startup")
+def ensure_version_column():
+    """On startup, ensure DB has `version_id` and the weightage CHECK constraint.
+    This helps deployments (e.g. Render) where running separate migration scripts may be difficult.
+    """
+    try:
+        engine = _database.engine
+        insp = inspect(engine)
+        if "goals" not in insp.get_table_names():
+            return
+
+        cols = [c["name"] for c in insp.get_columns("goals")]
+        with engine.begin() as conn:
+            if "version_id" not in cols:
+                try:
+                    conn.execute(text("ALTER TABLE goals ADD COLUMN version_id integer NOT NULL DEFAULT 1"))
+                    print("Added 'version_id' column to goals table.")
+                except Exception as e:
+                    print("Failed to add version_id column:", e)
+
+            # Add CHECK constraint if missing (safe to attempt; ignore errors)
+            try:
+                existing_checks = [c["name"] for c in insp.get_check_constraints("goals")]
+            except Exception:
+                existing_checks = []
+
+            if "ck_goal_weightage_range" not in existing_checks:
+                try:
+                    conn.execute(text("ALTER TABLE goals ADD CONSTRAINT ck_goal_weightage_range CHECK (weightage >= 0 AND weightage <= 100)"))
+                    print("Added check constraint ck_goal_weightage_range on goals.weightage.")
+                except Exception:
+                    # Constraint may already exist or DB may not support naming; ignore
+                    pass
+    except Exception as exc:
+        # Do not crash the app on startup; surface to logs instead
+        print("Startup schema check failed:", exc)
 
 raw_origins = os.getenv("ALLOWED_ORIGINS")
 if raw_origins:
