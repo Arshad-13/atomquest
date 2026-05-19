@@ -106,47 +106,50 @@ def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), current
                 detail="Owner does not exist. Create a user first."
             )
 
-    # Rule 1: Check maximum goals limit (Max 8)
-    current_goals_count = db.query(models.Goal).filter(models.Goal.owner_id == goal.owner_id).count()
-    if current_goals_count >= 8:
-        raise HTTPException(
-            status_code=400, 
-            detail="Rule Violation: Maximum of 8 goals allowed per employee."
-        )
-
-    # Rule 2: Check total weightage limit (Max 100%)
-    current_weightage = db.query(func.sum(models.Goal.weightage)).filter(
-        models.Goal.owner_id == goal.owner_id
-    ).scalar() or 0.0
-    
-    if current_weightage + goal.weightage > 100.0:
-        raise HTTPException(
-            status_code=400, 
-            detail=f"Rule Violation: Adding this goal exceeds the 100% weightage limit. Current total: {current_weightage}%"
-        )
-
-    # Create the goal if validations pass
-    new_goal = models.Goal(
-        owner_id=goal.owner_id,
-        thrust_area=goal.thrust_area,
-        title=goal.title,
-        description=goal.description,
-        uom=goal.uom,
-        target=goal.target,
-        weightage=goal.weightage
-    )
-    
+    # Enforce rules transactionally to avoid race conditions
     try:
-        db.add(new_goal)
-        db.commit()
-        db.refresh(new_goal)
+        with db.begin():
+            # Lock all goals for this owner to compute counts and totals safely
+            owner_goals = db.query(models.Goal).filter(models.Goal.owner_id == goal.owner_id).with_for_update().all()
+
+            # Rule 1: Check maximum goals limit (Max 8)
+            current_goals_count = len(owner_goals)
+            if current_goals_count >= 8:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Rule Violation: Maximum of 8 goals allowed per employee."
+                )
+
+            # Rule 2: Check total weightage limit (Max 100%)
+            current_weightage = sum([g.weightage for g in owner_goals]) if owner_goals else 0.0
+            if current_weightage + goal.weightage > 100.0:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Rule Violation: Adding this goal exceeds the 100% weightage limit. Current total: {current_weightage}%"
+                )
+
+            # Create the goal if validations pass
+            new_goal = models.Goal(
+                owner_id=goal.owner_id,
+                thrust_area=goal.thrust_area,
+                title=goal.title,
+                description=goal.description,
+                uom=goal.uom,
+                target=goal.target,
+                weightage=goal.weightage
+            )
+            db.add(new_goal)
+            # commit happens at context manager exit
+            db.flush()
+            db.refresh(new_goal)
+
     except IntegrityError:
         db.rollback()
         raise HTTPException(
             status_code=400,
             detail="Goal could not be created. Check owner_id and payload."
         )
-    
+
     return new_goal
 
 def calculate_progress_score(actual: float, target: float, uom: models.UoMEnum) -> float:
@@ -717,39 +720,53 @@ def approve_goal(
     if goal.status != "submitted":
         raise HTTPException(status_code=400, detail="Goal is not pending approval.")
 
-    # 2. Track changes for the Audit Log
-    changes = []
-    if payload.target != goal.target:
-        changes.append(f"Target changed: {goal.target} -> {payload.target}")
-        goal.target = payload.target
-        
-    if payload.weightage != goal.weightage:
-        changes.append(f"Weightage changed: {goal.weightage} -> {payload.weightage}")
-        goal.weightage = payload.weightage
+    # 2. Apply transactional approval while checking weightage atomically
+    try:
+        with db.begin():
+            # Lock all goals for the owner to compute totals safely
+            owner_goals = db.query(models.Goal).filter(models.Goal.owner_id == goal.owner_id).with_for_update().all()
 
-    # 3. Apply State Changes
-    goal.status = "approved"
-    goal.is_locked = True
+            # Prepare changes and validate new totals
+            changes = []
+            if payload.target != goal.target:
+                changes.append(f"Target changed: {goal.target} -> {payload.target}")
+                goal.target = payload.target
 
-    # 4. Create the Approval Request record (Phase 2 Requirement)
-    approval_record = models.ApprovalRequest(
-        goal_id=goal.id,
-        action="APPROVED",
-        submitted_by=goal.owner_id,
-        reviewed_by=current_user.id
-    )
-    db.add(approval_record)
+            if payload.weightage != goal.weightage:
+                changes.append(f"Weightage changed: {goal.weightage} -> {payload.weightage}")
+                # compute total excluding this goal
+                total_excluding = sum([g.weightage for g in owner_goals if g.id != goal.id])
+                if total_excluding + payload.weightage > 100.0:
+                    raise HTTPException(status_code=400, detail=f"Rule Violation: Approving with weightage {payload.weightage} would exceed 100% total for the owner.")
+                goal.weightage = payload.weightage
 
-    # 5. Create the Immutable Audit Log (Phase 1 Bonus)
-    changes.append("Goal was APPROVED and LOCKED.")
-    audit_entry = models.AuditLog(
-        goal_id=goal.id,
-        changed_by=current_user.id,
-        change_summary=" | ".join(changes)
-    )
-    db.add(audit_entry)
+            # 3. Apply State Changes
+            goal.status = "approved"
+            goal.is_locked = True
 
-    db.commit()
+            # 4. Create the Approval Request record (Phase 2 Requirement)
+            approval_record = models.ApprovalRequest(
+                goal_id=goal.id,
+                action="APPROVED",
+                submitted_by=goal.owner_id,
+                reviewed_by=current_user.id
+            )
+            db.add(approval_record)
+
+            # 5. Create the Immutable Audit Log (Phase 1 Bonus)
+            changes.append("Goal was APPROVED and LOCKED.")
+            audit_entry = models.AuditLog(
+                goal_id=goal.id,
+                changed_by=current_user.id,
+                change_summary=" | ".join(changes)
+            )
+            db.add(audit_entry)
+
+            db.flush()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=400, detail="Failed to approve goal due to DB error")
+
     return {"message": "Goal approved successfully"}
 
 

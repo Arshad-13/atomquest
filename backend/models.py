@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Enum, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Enum, Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, CheckConstraint
 from sqlalchemy.orm import declarative_base, relationship
 from sqlalchemy.sql import func
 
@@ -59,6 +59,15 @@ class Goal(Base):
     is_locked = Column(Boolean, default=False) # Locked after manager approval
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Optimistic locking/versioning to avoid lost updates
+    version_id = Column(Integer, nullable=False, default=1)
+    __mapper_args__ = {"version_id_col": version_id}
+
+    # DB-level constraint: weightage must be between 0 and 100
+    __table_args__ = (
+        CheckConstraint('weightage >= 0 AND weightage <= 100', name='ck_goal_weightage_range'),
+    )
 
     owner = relationship("User", back_populates="goals")
     check_ins = relationship("CheckIn", back_populates="goal")

@@ -30,6 +30,7 @@ class GoalResponse(GoalBase):
     owner_id: str
     status: Optional[str] = "draft"
     is_locked: bool
+    version_id: int
     return_comment: Optional[str] = None
     
     class Config:
