@@ -36,7 +36,7 @@ export const CheckInsPage = () => {
   const [savingRows, setSavingRows] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
-    const fetchCheckInData = async () => {
+    async function fetchCheckInData() {
       if (!user?.id) return;
       try {
         // 1. Fetch current active window
@@ -69,7 +69,7 @@ export const CheckInsPage = () => {
           
           setGoals(hydratedGoals);
         }
-      } catch (err) {
+      } catch (err: any) {
         addToast("Error preparing check-in workspace.", "error");
       } finally {
         setLoading(false);
@@ -95,7 +95,7 @@ export const CheckInsPage = () => {
       if (uom === 'timeline') {
         return actual > 0 ? Number(((target / actual) * 100).toFixed(2)) : 100;
       }
-    } catch {
+    } catch (err: any) {
       return 0;
     }
     return 0;
@@ -110,7 +110,7 @@ export const CheckInsPage = () => {
     }));
   };
 
-  const handleSaveCheckIn = async (goal: ApprovedGoal) => {
+  async function handleSaveCheckIn(goal: ApprovedGoal) {
     if (!activeCycle) return;
     setSavingRows(prev => ({ ...prev, [goal.id]: true }));
 
@@ -123,7 +123,19 @@ export const CheckInsPage = () => {
       };
 
       // Post progress updates to Phase 2 API
-      await apiClient.post('/check-ins', payload);
+      const res = await apiClient.post('/check-ins', payload);
+      
+      // Sync state so the local goal has the newly generated current_check_in_id
+      setGoals(prev => prev.map(g => {
+        if (g.id === goal.id) {
+          return {
+            ...g,
+            current_check_in_id: res.data.id
+          };
+        }
+        return g;
+      }));
+
       addToast(`Progress saved for "${goal.title}"`, "success");
     } catch (err: any) {
       addToast(err.response?.data?.detail || "Failed to save update", "error");

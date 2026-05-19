@@ -49,7 +49,7 @@ export const GoalDetailPage = () => {
   const [history, setHistory] = useState<ApprovalRequest[]>([]);
 
   useEffect(() => {
-    const fetchGoalDetails = async () => {
+    async function fetchGoalDetails() {
       try {
         // Run fetches in parallel for speed
         const [goalRes, checkInsRes, historyRes] = await Promise.all([
@@ -63,7 +63,7 @@ export const GoalDetailPage = () => {
         setGoal(goalRes.data);
         setCheckIns(checkInsRes.data);
         setHistory(historyRes.data);
-      } catch (err) {
+      } catch {
         addToast("Failed to load goal details.", "error");
         navigate('/goals');
       } finally {

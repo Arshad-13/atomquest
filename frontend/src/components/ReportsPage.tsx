@@ -34,11 +34,7 @@ export const ReportsPage = () => {
   const [completionData, setCompletionData] = useState<CompletionData[]>([]);
   const [downloadingCSV, setDownloadingCSV] = useState(false);
 
-  useEffect(() => {
-    fetchReports();
-  }, []);
-
-  const fetchReports = async () => {
+  async function fetchReports() {
     try {
       const [achieveRes, compRes] = await Promise.all([
         apiClient.get('/reports/achievement'),
@@ -46,14 +42,18 @@ export const ReportsPage = () => {
       ]);
       setAchievementData(achieveRes.data);
       setCompletionData(compRes.data);
-    } catch (err) {
+    } catch {
       addToast("Failed to load corporate reports.", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleDownloadCSV = async () => {
+  useEffect(() => {
+    fetchReports();
+  }, []);
+
+  async function handleDownloadCSV() {
     setDownloadingCSV(true);
     try {
       // Direct fetch to handle the Blob response correctly
@@ -75,7 +75,7 @@ export const ReportsPage = () => {
       window.URL.revokeObjectURL(url);
       
       addToast("CSV Download initialized.", "success");
-    } catch (err) {
+    } catch {
       addToast("Failed to download CSV.", "error");
     } finally {
       setDownloadingCSV(false);

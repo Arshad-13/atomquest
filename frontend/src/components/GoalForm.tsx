@@ -43,6 +43,9 @@ export const GoalForm = () => {
   const [submitting, setSubmitting] = useState(false);
   const [baseWeightage, setBaseWeightage] = useState(0); // Total weightage of *other* goals
   const [goalCount, setGoalCount] = useState(0);
+  const [fetchedReturnComment, setFetchedReturnComment] = useState<string | null>(null);
+
+  const activeReturnComment = returnComment || fetchedReturnComment;
 
   const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<GoalFormData>({
     mode: 'onBlur',
@@ -54,7 +57,7 @@ export const GoalForm = () => {
   const totalProjectedWeightage = baseWeightage + Number(currentWeightage);
 
   useEffect(() => {
-    const initializeForm = async () => {
+    async function initializeForm() {
       if (!user?.id) return;
       try {
         // 1. Fetch all goals to calculate budget and count
@@ -73,9 +76,14 @@ export const GoalForm = () => {
         // 2. If editing, fetch the specific goal to populate the form
         if (isEditMode) {
           const goalToEdit = allGoals.find((g: any) => g.id === Number(id));
-          if (goalToEdit) reset(goalToEdit);
+          if (goalToEdit) {
+            reset(goalToEdit);
+            if (goalToEdit.return_comment) {
+              setFetchedReturnComment(goalToEdit.return_comment);
+            }
+          }
         }
-      } catch (error) {
+      } catch (_error) {
         addToast("Failed to load goal data", "error");
       } finally {
         setLoading(false);
@@ -85,16 +93,35 @@ export const GoalForm = () => {
     initializeForm();
   }, [user?.id, id, isEditMode, reset, addToast]);
 
-  const onSubmit = async (data: GoalFormData, action: 'draft' | 'submit') => {
+  const onFormError = (formErrors: any) => {
+    console.warn("Validation errors:", formErrors);
+    const firstError = Object.values(formErrors)[0] as any;
+    if (firstError?.message) {
+      addToast(firstError.message, "error");
+    } else {
+      addToast("Please check all required fields.", "error");
+    }
+  };
+
+  async function onSubmit(data: GoalFormData, action: 'draft' | 'submit') {
     setSubmitting(true);
     try {
       let savedGoalId = id;
 
       // 1. Save the Goal (Create or Update)
+      const sanitizedData = {
+        thrust_area: data.thrust_area,
+        title: data.title,
+        description: data.description,
+        uom: data.uom,
+        target: data.target,
+        weightage: data.weightage
+      };
+
       if (isEditMode) {
-        await apiClient.patch(`/goals/${id}`, data);
+        await apiClient.patch(`/goals/${id}`, sanitizedData);
       } else {
-        const payload = { ...data, owner_id: user?.id };
+        const payload = { ...sanitizedData, owner_id: user?.id };
         const response = await apiClient.post('/goals', payload);
         savedGoalId = response.data.id;
       }
@@ -132,17 +159,40 @@ export const GoalForm = () => {
       </div>
 
       {/* Return Comment Banner */}
-      {returnComment && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-lg">
-          <div className="flex">
-            <div className="flex-shrink-0">⚠️</div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Manager Returned for Rework</h3>
-              <div className="mt-1 text-sm text-red-700">{returnComment}</div>
+      {activeReturnComment && (() => {
+        const systemChangesMatch = activeReturnComment.match(/\[MANAGER SUGGESTED CHANGES:\s*(.*?)\]/);
+        const displayComment = systemChangesMatch 
+          ? activeReturnComment.replace(/\[MANAGER SUGGESTED CHANGES:\s*.*?\]/, '').trim() 
+          : activeReturnComment;
+        const suggestedChanges = systemChangesMatch ? systemChangesMatch[1] : null;
+
+        return (
+          <div className="bg-red-50 border border-red-200 dark:bg-red-950/20 dark:border-red-900/50 p-4 rounded-xl flex gap-3 shadow-sm animate-in slide-in-from-top-4 duration-300">
+            <span className="text-red-500 dark:text-red-400 text-xl flex-shrink-0">⚠️</span>
+            <div className="flex-1">
+              <h3 className="text-sm font-bold text-red-900 dark:text-red-100">Manager Returned for Rework</h3>
+              <div className="mt-1 text-sm text-red-700 dark:text-red-300 whitespace-pre-line leading-relaxed">
+                {displayComment}
+              </div>
+              
+              {suggestedChanges && (
+                <div className="mt-3 pt-3 border-t border-red-200/50 dark:border-red-900/30">
+                  <span className="text-xs font-bold text-red-800 dark:text-red-400 uppercase tracking-wider block mb-2">
+                    Manager Recommended Parameters (Pre-filled):
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {suggestedChanges.split(' | ').map((change: string, idx: number) => (
+                      <span key={idx} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">
+                        {change}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Live Budget & Limitations Tracker */}
       <Card className="p-5 bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-900/10 dark:to-surface-dark border-indigo-100 dark:border-indigo-900/30">
@@ -178,7 +228,13 @@ export const GoalForm = () => {
         </div>
         
         {totalProjectedWeightage > 100 && (
-          <p className="text-xs text-red-500 mt-2 font-medium">Warning: Total weightage across all goals cannot exceed 100%.</p>
+          <p className="text-xs text-red-500 mt-2 font-medium">⚠️ Warning: Total weightage across all goals cannot exceed 100%.</p>
+        )}
+        {totalProjectedWeightage !== 100 && (
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">⚠️ Strict Limit: Total weightage must be exactly 100% to submit sheet for manager approval. (Current: {totalProjectedWeightage}%)</p>
+        )}
+        {totalProjectedWeightage === 100 && (
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-semibold">✅ Perfect! Total weightage is exactly 100%. Ready to submit.</p>
         )}
       </Card>
 
@@ -274,7 +330,7 @@ export const GoalForm = () => {
             <Button 
               type="button" 
               variant="secondary" 
-              onClick={handleSubmit((data) => onSubmit(data, 'draft'))}
+              onClick={handleSubmit((data) => onSubmit(data, 'draft'), onFormError)}
               disabled={submitting || totalProjectedWeightage > 100 || goalCount >= MAX_GOALS && !isEditMode}
             >
               Save as Draft
@@ -285,7 +341,7 @@ export const GoalForm = () => {
               type="button" 
               variant="primary" 
               isLoading={submitting}
-              onClick={handleSubmit((data) => onSubmit(data, 'submit'))}
+              onClick={handleSubmit((data) => onSubmit(data, 'submit'), onFormError)}
               disabled={totalProjectedWeightage !== 100}
               title={totalProjectedWeightage !== 100 ? "Total weightage must be exactly 100% to submit for approval." : ""}
             >

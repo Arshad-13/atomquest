@@ -36,11 +36,7 @@ export const ApprovalsPage = () => {
   const [comments, setComments] = useState<{ [checkInId: number]: string }>({});
   const [savingId, setSavingId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchTeamCheckIns();
-  }, [user?.id, selectedQuarter]);
-
-  const fetchTeamCheckIns = async () => {
+  async function fetchTeamCheckIns() {
     if (!user?.id) return;
     setLoading(true);
     try {
@@ -55,18 +51,22 @@ export const ApprovalsPage = () => {
         initialComments[ci.id] = ci.manager_comment || "";
       });
       setComments(initialComments);
-    } catch (err) {
+    } catch {
       addToast("Failed to load team quarterly data metrics.", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchTeamCheckIns();
+  }, [user?.id, selectedQuarter]);
 
   const handleCommentChange = (id: number, text: string) => {
     setComments(prev => ({ ...prev, [id]: text }));
   };
 
-  const handleSaveComment = async (checkInId: number) => {
+  async function handleSaveComment(checkInId: number) {
     const textToCommit = comments[checkInId];
     if (!textToCommit?.trim()) {
       addToast("Feedback summary statement is required before saving.", "error");
@@ -84,7 +84,7 @@ export const ApprovalsPage = () => {
       
       // Update data mapping array locally to establish persistence indicators
       setCheckIns(prev => prev.map(ci => ci.id === checkInId ? { ...ci, manager_comment: textToCommit } : ci));
-    } catch (err) {
+    } catch {
       addToast("Failed to serialize feedback review.", "error");
     } finally {
       setSavingId(null);

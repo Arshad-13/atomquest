@@ -41,11 +41,11 @@ export const CycleConfigPage = () => {
     fetchCycles();
   }, []);
 
-  const fetchCycles = async () => {
+  async function fetchCycles() {
     try {
       const response = await apiClient.get('/cycles');
       setCycles(response.data);
-    } catch (err) {
+    } catch {
       addToast("Failed to load cycle configurations.", "error");
     } finally {
       setLoading(false);
@@ -65,7 +65,7 @@ export const CycleConfigPage = () => {
     }
   };
 
-  const handleActivateCycle = async () => {
+  async function handleActivateCycle() {
     if (!openDate || !closeDate) {
       addToast("Both open and close dates are required.", "error");
       return;
@@ -89,7 +89,7 @@ export const CycleConfigPage = () => {
       addToast(`${activeModalPeriod} window successfully activated.`, "success");
       setActiveModalPeriod(null);
       fetchCycles(); // Refresh the grid to show the new active state
-    } catch (err) {
+    } catch {
       addToast("Failed to activate cycle window.", "error");
     } finally {
       setSubmitting(false);

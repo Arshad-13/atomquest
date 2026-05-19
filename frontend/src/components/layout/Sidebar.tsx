@@ -16,11 +16,11 @@ export const Sidebar = () => {
     { label: 'Dashboard', path: '/dashboard', roles: ['employee', 'manager', 'admin'] },
   ];
 
-  // Personal OKR goal sheet and check-in panels only apply to employees and managers, not root HR admins
-  if (role === 'employee' || role === 'manager') {
+  // Personal OKR goal sheet and check-in panels only apply to employees.
+  if (role === 'employee') {
     navItems.push(
-      { label: 'My Goals', path: '/goals', roles: ['employee', 'manager'] },
-      { label: 'Check-ins', path: '/checkins', roles: ['employee', 'manager'] }
+      { label: 'My Goals', path: '/goals', roles: ['employee'] },
+      { label: 'Check-ins', path: '/checkins', roles: ['employee'] }
     );
   }
 
@@ -28,7 +28,7 @@ export const Sidebar = () => {
   if (role === 'manager' || role === 'admin') {
     navItems.push(
       { label: 'Team Goals', path: '/team', roles: ['manager', 'admin'] },
-      { label: 'Approvals', path: '/approvals', roles: ['manager', 'admin'] }
+      { label: 'Team Reviews', path: '/approvals', roles: ['manager', 'admin'] }
     );
   }
 

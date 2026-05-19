@@ -43,7 +43,7 @@ export const EmployeeDashboard = () => {
     fetchDashboardData();
   }, [user?.id]);
 
-  const fetchDashboardData = async () => {
+  async function fetchDashboardData() {
     if (!user?.id) return;
     try {
       const [goalsRes, analyticsRes] = await Promise.all([
@@ -53,7 +53,7 @@ export const EmployeeDashboard = () => {
       
       setGoals(goalsRes.data);
       setAnalyticsData(analyticsRes.data);
-    } catch (err) {
+    } catch {
       addToast("Failed to load dashboard data.", "error");
     } finally {
       setLoading(false);
@@ -61,23 +61,23 @@ export const EmployeeDashboard = () => {
   };
 
   // --- Keep your existing Goal Actions (submitGoalForApproval, deleteGoal, formatUoM) ---
-  const submitGoalForApproval = async (goalId: number) => {
+  async function submitGoalForApproval(goalId: number) {
     setProcessingId(goalId);
     try {
       await apiClient.post(`/goals/${goalId}/submit`);
       addToast("Goal submitted for manager review!", "success");
       fetchDashboardData();
-    } catch (err) { addToast("Failed to submit.", "error"); } finally { setProcessingId(null); }
+    } catch { addToast("Failed to submit.", "error"); } finally { setProcessingId(null); }
   };
 
-  const deleteGoal = async (goalId: number) => {
+  async function deleteGoal(goalId: number) {
     if (!window.confirm("Are you sure?")) return;
     setProcessingId(goalId);
     try {
       await apiClient.delete(`/goals/${goalId}`);
       addToast("Goal deleted.", "success");
       fetchDashboardData();
-    } catch (err) { addToast("Failed to delete.", "error"); } finally { setProcessingId(null); }
+    } catch { addToast("Failed to delete.", "error"); } finally { setProcessingId(null); }
   };
 
   const formatUoM = (uom: string) => {

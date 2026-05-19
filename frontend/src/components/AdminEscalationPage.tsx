@@ -32,11 +32,7 @@ export const AdminEscalationPage = () => {
   const [logs, setLogs] = useState<EscalationLog[]>([]);
   const [savingRuleId, setSavingRuleId] = useState<number | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
+  async function fetchData() {
     try {
       const [rulesRes, logsRes] = await Promise.all([
         apiClient.get('/admin/escalation-rules').catch(() => ({ data: [] })),
@@ -44,18 +40,22 @@ export const AdminEscalationPage = () => {
       ]);
       setRules(rulesRes.data);
       setLogs(logsRes.data);
-    } catch (err) {
+    } catch {
       addToast("Failed to load escalation data.", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const handleRuleChange = (id: number, field: keyof EscalationRule, value: any) => {
     setRules(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r));
   };
 
-  const saveRule = async (rule: EscalationRule) => {
+  async function saveRule(rule: EscalationRule) {
     setSavingRuleId(rule.id);
     try {
       await apiClient.patch(`/admin/escalation-rules/${rule.id}`, {
@@ -63,7 +63,7 @@ export const AdminEscalationPage = () => {
         is_active: rule.is_active
       });
       addToast("Escalation rule updated successfully.", "success");
-    } catch (err) {
+    } catch {
       addToast("Failed to update rule.", "error");
     } finally {
       setSavingRuleId(null);

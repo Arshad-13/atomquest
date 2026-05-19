@@ -30,6 +30,7 @@ class GoalResponse(GoalBase):
     owner_id: str
     status: Optional[str] = "draft"
     is_locked: bool
+    return_comment: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -193,6 +194,8 @@ class GoalApproveRequest(BaseModel):
 
 class GoalReturnRequest(BaseModel):
     comment: str
+    target: Optional[float] = None
+    weightage: Optional[float] = None
 
 class TeamCheckInResponse(BaseModel):
     id: int  # Check-in ID

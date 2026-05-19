@@ -78,7 +78,7 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
     }
   };
 
-  const onSubmitForm = async (data: any) => {
+  async function onSubmitForm(data: any) {
     if (step === 1) {
       if (!data.title) return addToast("Shared goal title is required.", "error");
       if (data.weightage <= 0) return addToast("Weightage must be greater than 0%.", "error");
@@ -102,7 +102,7 @@ export const SharedGoalModal = ({ isOpen, onClose, employees, onGoalCreated }: S
       addToast("Shared Goal successfully cascaded to team.", "success");
       onGoalCreated();
       handleClose();
-    } catch (err) {
+    } catch {
       addToast("Failed to push shared goal.", "error");
     } finally {
       setSubmitting(false);

@@ -45,11 +45,11 @@ export const AdminAnalyticsPage = () => {
   const [analytics, setAnalytics] = useState<ExecutiveAnalytics | null>(null);
 
   useEffect(() => {
-    const fetchExecutiveMetrics = async () => {
+    async function fetchExecutiveMetrics() {
       try {
         const response = await apiClient.get('/admin/executive-analytics');
         setAnalytics(response.data);
-      } catch (err) {
+      } catch {
         addToast("Failed to compile system organizational analytics data profiles.", "error");
       } finally {
         setLoading(false);

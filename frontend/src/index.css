@@ -1,3 +1,43 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background-light text-slate-800 dark:bg-background-dark dark:text-slate-100 transition-colors duration-300;
+  }
+}
+
+/* Dynamic Dark Mode Fallbacks - Forces minimum contrast for un-adapted Tailwind classes */
+@layer utilities {
+  .dark .text-gray-900:not([class*="dark:text-"]) {
+    color: theme('colors.gray.100') !important;
+  }
+  .dark .text-gray-800:not([class*="dark:text-"]) {
+    color: theme('colors.gray.200') !important;
+  }
+  .dark .text-gray-700:not([class*="dark:text-"]) {
+    color: theme('colors.gray.300') !important;
+  }
+  .dark .text-gray-600:not([class*="dark:text-"]) {
+    color: theme('colors.gray.400') !important;
+  }
+  .dark .text-gray-500:not([class*="dark:text-"]) {
+    color: theme('colors.gray.400') !important;
+  }
+  .dark .bg-white:not([class*="dark:bg-"]) {
+    background-color: theme('colors.surface.dark') !important;
+  }
+  .dark .bg-gray-50:not([class*="dark:bg-"]) {
+    background-color: theme('colors.background.dark') !important;
+  }
+  .dark .bg-gray-100:not([class*="dark:bg-"]) {
+    background-color: theme('colors.surface.dark') !important;
+  }
+  .dark .border-gray-200:not([class*="dark:border-"]) {
+    border-color: theme('colors.gray.800') !important;
+  }
+  .dark .border-gray-150:not([class*="dark:border-"]) {
+    border-color: theme('colors.gray.800') !important;
+  }
+}

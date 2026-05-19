@@ -19,6 +19,12 @@ from auth.dependencies import get_current_user, require_role
 from auth.router import router as auth_router
 import uuid
 from auth.security import get_password_hash
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Application environment
+APP_ENV = os.getenv("APP_ENV", "development")
 
 app = FastAPI()
 app.include_router(auth_router)
@@ -62,15 +68,11 @@ import traceback
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Catch-all for any unhandled server-side error."""
-    tb = traceback.format_exc()
-    return JSONResponse(
-        status_code=500,
-        content={
-            "detail": f"Internal Server Error: {str(exc)}",
-            "code": "INTERNAL_ERROR",
-            "traceback": tb
-        }
-    )
+    # In production do not leak internal tracebacks to the client
+    payload = {"detail": "Internal Server Error", "code": "INTERNAL_ERROR"}
+    if APP_ENV != "production":
+        payload.update({"detail": f"Internal Server Error: {str(exc)}", "traceback": traceback.format_exc()})
+    return JSONResponse(status_code=500, content=payload)
 
 @app.get("/health")
 @app.head("/health")
@@ -84,10 +86,8 @@ def create_goal(goal: schemas.GoalCreate, db: Session = Depends(get_db), current
     - Max 8 goals per employee
     - Total weightage cannot exceed 100%
     """
-    if current_user.role != models.RoleEnum.EMPLOYEE and current_user.id != goal.owner_id:
-         # Optionally allow managers/admins to create on behalf, but for now strict:
-         if current_user.role == models.RoleEnum.EMPLOYEE and current_user.id != goal.owner_id:
-             raise HTTPException(status_code=403, detail="Employees can only create their own goals.")
+    if current_user.role == models.RoleEnum.EMPLOYEE and current_user.id != goal.owner_id:
+        raise HTTPException(status_code=403, detail="Employees can only create their own goals.")
 
     owner = db.query(models.User).filter(models.User.id == goal.owner_id).first()
     if not owner:
@@ -174,10 +174,8 @@ def calculate_progress_score(actual: float, target: float, uom: models.UoMEnum) 
     return 0.0
 
 @app.get("/admin/audit-logs", response_model=List[schemas.AdminAuditLogResponse])
-def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_audit_logs(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Fetches the immutable system audit trail with fully resolved relational names."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
 
     # We alias the User table so we can join it twice without conflicts
     Employee = aliased(models.User)
@@ -222,6 +220,18 @@ def get_goal_by_id(goal_id: int, db: Session = Depends(get_db), current_user: mo
     # Employees can only view their own goals
     if current_user.role == models.RoleEnum.EMPLOYEE and goal.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Forbidden")
+        
+    # Populate return_comment dynamically
+    if goal.status == "returned" or goal.status == "draft":
+        latest_req = db.query(models.ApprovalRequest).filter(
+            models.ApprovalRequest.goal_id == goal.id,
+            models.ApprovalRequest.action == "RETURNED"
+        ).order_by(models.ApprovalRequest.actioned_at.desc()).first()
+        if latest_req:
+            goal.return_comment = latest_req.comment
+        else:
+            goal.return_comment = None
+            
     return goal
 
 @app.get("/goals/{owner_id}", response_model=list[schemas.GoalResponse])
@@ -230,6 +240,21 @@ def get_employee_goals(owner_id: str, db: Session = Depends(get_db), current_use
     if current_user.role == models.RoleEnum.EMPLOYEE and current_user.id != owner_id:
         raise HTTPException(status_code=403, detail="Forbidden")
     goals = db.query(models.Goal).filter(models.Goal.owner_id == owner_id).all()
+    
+    # Populate return_comment dynamically for all returned/draft goals
+    for g in goals:
+        if g.status == "returned" or g.status == "draft":
+            latest_req = db.query(models.ApprovalRequest).filter(
+                models.ApprovalRequest.goal_id == g.id,
+                models.ApprovalRequest.action == "RETURNED"
+            ).order_by(models.ApprovalRequest.actioned_at.desc()).first()
+            if latest_req:
+                g.return_comment = latest_req.comment
+            else:
+                g.return_comment = None
+        else:
+            g.return_comment = None
+            
     return goals
 
 
@@ -271,7 +296,7 @@ def get_manager_team(manager_id: str, db: Session = Depends(get_db), current_use
     results = []
     for u in users:
         # Calculate sum of weightages
-        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id).scalar() or 0.0
+        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id, models.Goal.status == "approved").scalar() or 0.0
         # Determine if locked
         locked = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.is_locked == True).count() > 0
         results.append(schemas.UserBasicWithWeightage(
@@ -323,13 +348,45 @@ def get_goal_history(goal_id: int, db: Session = Depends(get_db), current_user: 
     history = db.query(models.ApprovalRequest).filter(models.ApprovalRequest.goal_id == goal_id).order_by(models.ApprovalRequest.actioned_at.asc()).all()
     return history
 
+
+@app.delete("/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_goal(goal_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Deletes a goal if it is in 'draft' or 'returned' status and belongs to the current user,
+    or if the current user is an Admin.
+    """
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+        
+    if current_user.role != models.RoleEnum.ADMIN:
+        if goal.owner_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Employees can only delete their own goals.")
+        if goal.is_locked or goal.status == "approved":
+            raise HTTPException(status_code=400, detail="Cannot delete an approved/locked goal.")
+            
+    # Delete associated records safely
+    db.query(models.CheckIn).filter(models.CheckIn.goal_id == goal_id).delete()
+    db.query(models.ApprovalRequest).filter(models.ApprovalRequest.goal_id == goal_id).delete()
+    db.query(models.AuditLog).filter(models.AuditLog.goal_id == goal_id).delete()
+    db.query(models.SharedGoalLink).filter(
+        (models.SharedGoalLink.base_goal_id == goal_id) | 
+        (models.SharedGoalLink.recipient_id == goal.owner_id)
+    ).delete()
+    
+    db.delete(goal)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.patch("/goals/{goal_id}", response_model=schemas.GoalResponse)
 def update_or_approve_goal(goal_id: int, updates: schemas.GoalUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """
     Allows employees to edit draft/returned goals and managers to edit targets inline or approve (lock) the goal.
     Automatically generates an Audit Trail log.
     """
-    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
+    # Use pessimistic locking to prevent race conditions during concurrent updates
+    goal = db.query(models.Goal).filter(models.Goal.id == goal_id).with_for_update().first()
     
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
@@ -445,17 +502,28 @@ def create_check_in(check_in: schemas.CheckInCreate, db: Session = Depends(get_d
     if current_user.role == models.RoleEnum.EMPLOYEE and goal.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Can only log check-ins for your own active goals.")
 
-    # Create the check-in record
-    new_check_in = models.CheckIn(
-        goal_id=check_in.goal_id,
-        quarter=check_in.quarter,
-        actual_achievement=check_in.actual_achievement,
-        status=check_in.status
-    )
+    # Create or update the check-in record (Upsert)
+    existing_check_in = db.query(models.CheckIn).filter(
+        models.CheckIn.goal_id == check_in.goal_id,
+        models.CheckIn.quarter == check_in.quarter
+    ).first()
     
-    db.add(new_check_in)
-    db.commit()
-    db.refresh(new_check_in)
+    if existing_check_in:
+        existing_check_in.actual_achievement = check_in.actual_achievement
+        existing_check_in.status = check_in.status
+        db.commit()
+        db.refresh(existing_check_in)
+        new_check_in = existing_check_in
+    else:
+        new_check_in = models.CheckIn(
+            goal_id=check_in.goal_id,
+            quarter=check_in.quarter,
+            actual_achievement=check_in.actual_achievement,
+            status=check_in.status
+        )
+        db.add(new_check_in)
+        db.commit()
+        db.refresh(new_check_in)
     
     return build_check_in_response(new_check_in, goal)
 
@@ -635,16 +703,17 @@ def approve_goal(
     goal_id: int, 
     payload: schemas.GoalApproveRequest, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))
 ):
     """Manager approves a goal, applies inline edits, locks it, and logs the audit."""
-    
-    if current_user.role not in [models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]:
-        raise HTTPException(status_code=403, detail="Only managers can return goals.")
 
     goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
+    if current_user.role == models.RoleEnum.MANAGER:
+        owner = db.query(models.User).filter(models.User.id == goal.owner_id).first()
+        if not owner or owner.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Can only approve goals for your own team.")
     if goal.status != "submitted":
         raise HTTPException(status_code=400, detail="Goal is not pending approval.")
 
@@ -689,48 +758,83 @@ def return_goal(
     goal_id: int, 
     payload: schemas.GoalReturnRequest, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))
 ):
     """Manager returns a goal to the employee with mandatory rework feedback."""
-
-    if current_user.role not in [models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]:
-        raise HTTPException(status_code=403, detail="Only managers can approve goals.")
 
     goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
+    if current_user.role == models.RoleEnum.MANAGER:
+        owner = db.query(models.User).filter(models.User.id == goal.owner_id).first()
+        if not owner or owner.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Can only return goals for your own team.")
 
-    # 1. Flip status back to returned
+    # 1. Update target and weightage to the manager's recommended parameters if provided
+    changes = []
+    if payload.target is not None and payload.target != goal.target:
+        changes.append(f"Target adjusted from {goal.target} to {payload.target}")
+        goal.target = payload.target
+        
+    if payload.weightage is not None and payload.weightage != goal.weightage:
+        # Enforce strict 100% total weightage limit validation for return updates as well
+        current_other_weightage = db.query(func.sum(models.Goal.weightage)).filter(
+            models.Goal.owner_id == goal.owner_id,
+            models.Goal.id != goal.id
+        ).scalar() or 0.0
+        if current_other_weightage + payload.weightage > 100.0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Rule Violation: Manager's suggested weightage of {payload.weightage}% exceeds the 100% limit for this sheet. Current other goals total: {current_other_weightage}%."
+            )
+        changes.append(f"Weightage adjusted from {goal.weightage} to {payload.weightage}")
+        goal.weightage = payload.weightage
+
+    # 2. Flip status back to returned
     goal.status = "returned"
     goal.is_locked = False
 
-    # 2. Create the Rejection Record with the manager's comment
+    # 3. Create the Rejection Record with the manager's comment (appending suggested parameters if adjusted)
+    full_comment = payload.comment
+    if changes:
+        full_comment += "\n\n[MANAGER SUGGESTED CHANGES: " + " | ".join(changes) + "]"
+
     rejection_record = models.ApprovalRequest(
         goal_id=goal.id,
         action="RETURNED",
-        comment=payload.comment,
+        comment=full_comment,
         submitted_by=goal.owner_id,
         reviewed_by=current_user.id
     )
     
     db.add(rejection_record)
+    
+    # Audit log if parameters were changed by the manager
+    if changes:
+        audit_entry = models.AuditLog(
+            goal_id=goal.id,
+            changed_by=current_user.id,
+            change_summary="Manager adjusted returned goal parameters: " + " | ".join(changes)
+        )
+        db.add(audit_entry)
+        
     db.commit()
     
-    return {"message": "Goal returned to employee"}
+    return {"message": "Goal returned to employee with recommended parameter updates"}
 
 @app.get("/managers/{manager_id}/team-check-ins", response_model=List[schemas.TeamCheckInResponse])
 def get_team_check_ins(
     manager_id: str, 
     quarter: str, 
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))
 ):
     """
     Fetches all quarterly check-in submissions for employees reporting directly to the manager.
     Filters strictly by the specified quarter parameter (e.g., Q1, Q2).
     """
-    if current_user.role not in [models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]:
-        raise HTTPException(status_code=403, detail="Access denied. Insufficient role permissions.")
+    if current_user.role == models.RoleEnum.MANAGER and current_user.id != manager_id:
+        raise HTTPException(status_code=403, detail="Can only view your own team.")
 
     # Optimized join querying check-ins, tracking up through goals to direct employee records
     records = db.query(
@@ -843,12 +947,9 @@ def get_manager_analytics(
 def push_shared_goal(
     payload: schemas.SharedGoalCreate, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]))
 ):
     """Creates a master goal and cascades it to selected direct reports."""
-    if current_user.role not in [models.RoleEnum.MANAGER, models.RoleEnum.ADMIN]:
-        raise HTTPException(status_code=403, detail="Unauthorized.")
-
     # 1. Create the Master "Base" Goal (Owned by the Manager)
     base_goal = models.Goal(
         title=f"[SHARED] {payload.title}",
@@ -876,15 +977,9 @@ def push_shared_goal(
                 detail=f"Rule Violation: Pushing tasks is strictly limited to standard Employees. '{recipient.name}' is a '{recipient.role.value}'."
             )
 
-        # Strict validation: verify that adding this shared goal does not push them over the 100% limit
-        current_weightage = db.query(func.sum(models.Goal.weightage)).filter(
-            models.Goal.owner_id == recipient_id
-        ).scalar() or 0.0
-        if current_weightage + payload.weightage > 100.0:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Rule Violation: Pushing this shared goal (+{payload.weightage}%) would exceed the 100% limit for '{recipient.name}'. Current total: {current_weightage}%."
-            )
+        # We skip the strict 100% validation check here to allow managers to push goals.
+        # If this pushes the employee over 100%, their sheet is unlocked and reverted to draft,
+        # forcing them to rebalance their weightages to 100% before they can submit again.
 
         # Create a mirrored draft on the employee's sheet
         emp_goal = models.Goal(
@@ -936,17 +1031,13 @@ def push_shared_goal(
     return {"message": f"Shared goal successfully pushed to {len(payload.recipient_ids)} employees."}
 
 @app.get("/cycles")
-def get_all_cycles(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_all_cycles(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Admin route to view all configured cycle windows."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin access required.")
     return db.query(models.CycleWindow).order_by(models.CycleWindow.open_date.desc()).all()
 
 @app.get("/admin/completion-dashboard", response_model=List[schemas.AdminCompletionRow])
-def get_completion_dashboard(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_completion_dashboard(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Admin endpoint to aggregate org-wide compliance and completion data."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
 
     # 1. Get the active cycle to check compliance against the current window
     active_cycle = db.query(models.CycleWindow).filter(models.CycleWindow.is_active == True).first()
@@ -997,10 +1088,8 @@ def get_completion_dashboard(db: Session = Depends(get_db), current_user: models
     return dashboard_data
 
 @app.get("/admin/goals/locked")
-def get_all_locked_goals(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_all_locked_goals(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Admin route to fetch all locked goals across the entire organization."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
     
     # Fetch all locked goals and join the owner's name for the UI
     locked_goals = db.query(
@@ -1024,11 +1113,9 @@ def admin_unlock_goal(
     goal_id: int, 
     payload: schemas.AdminUnlockRequest, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))
 ):
     """Executes a system-level override to unlock a goal and stamps the audit log."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
 
     goal = db.query(models.Goal).filter(models.Goal.id == goal_id).first()
     if not goal:
@@ -1052,10 +1139,8 @@ def admin_unlock_goal(
     return {"message": "Goal successfully unlocked and audit log updated."}
 
 @app.get("/admin/shared-goals")
-def get_all_shared_goals(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_all_shared_goals(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Fetch all pushed shared goals in the system."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
         
     shared_goals = db.query(models.Goal).filter(models.Goal.title.like("[SHARED]%")).all()
     results = []
@@ -1081,11 +1166,9 @@ def cancel_shared_goal(
     base_goal_id: int, 
     payload: schemas.AdminUnlockRequest, 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))
 ):
     """Cancel (delete) a shared goal, cascading deletion to all mirrored employee goals and links."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
         
     base_goal = db.query(models.Goal).filter(models.Goal.id == base_goal_id).first()
     if not base_goal:
@@ -1126,7 +1209,7 @@ def get_all_users_directory(db: Session = Depends(get_db), current_user: models.
     users = db.query(models.User).order_by(models.User.name).all()
     results = []
     for u in users:
-        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id).scalar() or 0.0
+        total_w = db.query(func.sum(models.Goal.weightage)).filter(models.Goal.owner_id == u.id, models.Goal.status == "approved").scalar() or 0.0
         locked = db.query(models.Goal).filter(models.Goal.owner_id == u.id, models.Goal.is_locked == True).count() > 0
         mgr_name = None
         if u.manager_id:
@@ -1215,11 +1298,9 @@ def admin_reset_user_password(
 def get_achievement_report(
     format: Optional[str] = "json", 
     db: Session = Depends(get_db), 
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))
 ):
     """Fetches planned vs actual data. Returns JSON by default, or streams a CSV if requested."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
 
     # Join CheckIns, Goals, and Users
     records = db.query(
@@ -1257,10 +1338,8 @@ def get_achievement_report(
 
 
 @app.get("/reports/completion")
-def get_completion_report(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_completion_report(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     """Aggregates check-in completion rates by Department and Quarter for the visual chart."""
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="System Admin access required.")
 
     # Mocking departments based on role like we did in 6.2
     users = db.query(models.User).filter(models.User.role != models.RoleEnum.ADMIN).all()
@@ -1356,6 +1435,37 @@ def get_employee_analytics(
         "line_data": line_data,
         "radar_data": radar_data
     }
+
+
+@app.get("/employees/{employee_id}/profile")
+def get_employee_profile(employee_id: str, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """
+    Fetches the profile info of the target employee, including their active manager's name dynamically.
+    Accessible by the employee themselves, their manager, or an admin.
+    """
+    if current_user.role != models.RoleEnum.ADMIN and current_user.id != employee_id:
+        target_user = db.query(models.User).filter(models.User.id == employee_id).first()
+        if not target_user or target_user.manager_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Forbidden")
+
+    u = db.query(models.User).filter(models.User.id == employee_id).first()
+    if not u:
+        raise HTTPException(status_code=404, detail="Employee not found")
+
+    mgr_name = None
+    if u.manager_id:
+        mgr = db.query(models.User).filter(models.User.id == u.manager_id).first()
+        if mgr:
+            mgr_name = mgr.name
+
+    return {
+        "id": u.id,
+        "name": u.name,
+        "email": u.email,
+        "role": u.role.value,
+        "manager_id": u.manager_id,
+        "manager_name": mgr_name
+    }
     
 @app.get("/admin/executive-analytics", response_model=schemas.AdminAnalyticsResponse)
 def get_admin_executive_analytics(
@@ -1366,8 +1476,6 @@ def get_admin_executive_analytics(
     Advanced executive analytics endpoint. Aggregates organizational health metrics,
     strategic alignment distributions, operational metrics, and leadership performance metrics.
     """
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Access denied. Executive clearance required.")
 
     # Fetch foundational datasets
     users = db.query(models.User).filter(models.User.role != models.RoleEnum.ADMIN).all()
@@ -1478,15 +1586,11 @@ def get_admin_executive_analytics(
 # --- Admin Endpoints ---
 
 @app.get("/admin/escalation-rules")
-def get_escalation_rules(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin only.")
+def get_escalation_rules(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     return db.query(models.EscalationRule).all()
 
 @app.patch("/admin/escalation-rules/{rule_id}")
-def update_escalation_rule(rule_id: int, payload: schemas.EscalationRuleUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin only.")
+def update_escalation_rule(rule_id: int, payload: schemas.EscalationRuleUpdate, db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
     
     rule = db.query(models.EscalationRule).filter(models.EscalationRule.id == rule_id).first()
     if not rule:
@@ -1498,9 +1602,7 @@ def update_escalation_rule(rule_id: int, payload: schemas.EscalationRuleUpdate, 
     return {"message": "Rule updated."}
 
 @app.get("/admin/escalation-logs")
-def get_escalation_logs(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    if current_user.role != models.RoleEnum.ADMIN:
-        raise HTTPException(status_code=403, detail="Admin only.")
+def get_escalation_logs(db: Session = Depends(get_db), current_user: models.User = Depends(require_role([models.RoleEnum.ADMIN]))):
         
     # Join to get user names
     logs = db.query(
@@ -1527,11 +1629,29 @@ def run_daily_escalations(db: Session):
     if unsubmitted_rule:
         active_cycle = db.query(models.CycleWindow).filter(models.CycleWindow.is_active == True, models.CycleWindow.period_name == "GOAL_SETTING").first()
         if active_cycle:
-            days_open = (datetime.utcnow() - active_cycle.open_date).days
+            now = datetime.now(timezone.utc)
+            open_dt = active_cycle.open_date.replace(tzinfo=timezone.utc) if active_cycle.open_date.tzinfo is None else active_cycle.open_date
+            days_open = (now - open_dt).days
             if days_open >= unsubmitted_rule.days_threshold:
-                # Find users who haven't submitted
-                # ... (Query logic here to find users with 0 submitted goals) ...
-                # Create models.EscalationLog entries for them
-                pass 
+                # Find employees who haven't submitted
+                employees = db.query(models.User).filter(models.User.role == models.RoleEnum.EMPLOYEE).all()
+                for emp in employees:
+                    submitted_count = db.query(models.Goal).filter(
+                        models.Goal.owner_id == emp.id,
+                        models.Goal.status != "draft"
+                    ).count()
+                    if submitted_count == 0:
+                        existing_log = db.query(models.EscalationLog).filter(
+                            models.EscalationLog.rule_id == unsubmitted_rule.id,
+                            models.EscalationLog.employee_id == emp.id,
+                            models.EscalationLog.is_resolved == False
+                        ).first()
+                        if not existing_log:
+                            db.add(models.EscalationLog(
+                                rule_id=unsubmitted_rule.id,
+                                employee_id=emp.id,
+                                manager_id=emp.manager_id
+                            ))
+                db.commit()
                 
     db.commit()

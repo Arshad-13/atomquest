@@ -54,11 +54,7 @@ export const AdminLockedGoalsPage = () => {
   const [cancelReason, setCancelReason] = useState("");
   const [submittingCancel, setSubmittingCancel] = useState(false);
 
-  useEffect(() => {
-    fetchData();
-  }, [activeTab]);
-
-  const fetchData = async () => {
+  async function fetchData() {
     setLoading(true);
     try {
       if (activeTab === 'locked') {
@@ -68,12 +64,16 @@ export const AdminLockedGoalsPage = () => {
         const response = await apiClient.get('/admin/shared-goals');
         setSharedGoals(response.data);
       }
-    } catch (err) {
+    } catch {
       addToast(`Failed to load ${activeTab === 'locked' ? 'locked' : 'shared'} goals.`, "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
 
   // UNLOCK ACTIONS
   const handleOpenUnlock = (goal: LockedGoal) => {
@@ -82,7 +82,7 @@ export const AdminLockedGoalsPage = () => {
     setUnlockModalOpen(true);
   };
 
-  const handleConfirmUnlock = async () => {
+  async function handleConfirmUnlock() {
     if (!unlockReason.trim() || unlockReason.length < 10) {
       addToast("A detailed reason (min 10 chars) is required for the audit trail.", "error");
       return;
@@ -99,7 +99,7 @@ export const AdminLockedGoalsPage = () => {
       addToast(`Goal #${selectedGoal.id} successfully unlocked.`, "success");
       setUnlockModalOpen(false);
       setGoals(prev => prev.filter(g => g.id !== selectedGoal.id));
-    } catch (err) {
+    } catch {
       addToast("Failed to execute admin override.", "error");
     } finally {
       setSubmittingUnlock(false);
@@ -113,7 +113,7 @@ export const AdminLockedGoalsPage = () => {
     setCancelModalOpen(true);
   };
 
-  const handleConfirmCancel = async () => {
+  async function handleConfirmCancel() {
     if (!cancelReason.trim() || cancelReason.length < 10) {
       addToast("A detailed reason (min 10 chars) is required for the audit trail.", "error");
       return;
@@ -130,7 +130,7 @@ export const AdminLockedGoalsPage = () => {
       addToast(`Shared goal "${selectedSharedGoal.title}" successfully canceled. Recipient sheets rebalanced.`, "success");
       setCancelModalOpen(false);
       setSharedGoals(prev => prev.filter(g => g.id !== selectedSharedGoal.id));
-    } catch (err) {
+    } catch {
       addToast("Failed to cancel shared goal.", "error");
     } finally {
       setSubmittingCancel(false);

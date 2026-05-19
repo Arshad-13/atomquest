@@ -46,12 +46,12 @@ export const AdminUsersPage = () => {
     fetchUsers();
   }, []);
 
-  const fetchUsers = async () => {
+  async function fetchUsers() {
     setLoading(true);
     try {
       const response = await apiClient.get('/admin/users');
       setUsers(response.data);
-    } catch (err) {
+    } catch (err: any) {
       addToast("Failed to load user directory.", "error");
     } finally {
       setLoading(false);
@@ -74,7 +74,7 @@ export const AdminUsersPage = () => {
     setModalOpen(true);
   };
 
-  const handleProvisionUser = async (e: React.FormEvent) => {
+  async function handleProvisionUser(e: React.FormEvent) {
     e.preventDefault();
     
     // Validations
@@ -115,7 +115,7 @@ export const AdminUsersPage = () => {
     setResetModalOpen(true);
   };
 
-  const handleResetConfirm = async (e: React.FormEvent) => {
+  async function handleResetConfirm(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedUserForReset) return;
     if (!resetPassword || resetPassword.length < 6) {

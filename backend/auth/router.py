@@ -1,3 +1,4 @@
+from sqlalchemy.exc import IntegrityError
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
@@ -78,21 +79,31 @@ async def login_with_azure(payload: AzureTokenRequest, db: Session = Depends(get
     role = map_groups_to_role(group_ids)
 
     # ── 4. Upsert the user in our database (create on first login) ───────────
-    user = db.query(User).filter(User.id == oid).first()
-    if not user:
-        # Also check by email in case they previously used the password flow
-        user = db.query(User).filter(User.email == email).first()
-    
-    if not user:
-        user = User(id=oid, name=name, email=email, role=role)
-        db.add(user)
-    else:
-        # Keep name and role in sync with Azure AD
+    try:
+        user = db.query(User).filter(User.id == oid).first()
+        if not user:
+            # Also check by email in case they previously used the password flow
+            user = db.query(User).filter(User.email == email).first()
+        
+        if not user:
+            user = User(id=oid, name=name, email=email, role=role)
+            db.add(user)
+            db.commit()
+            db.refresh(user)
+        else:
+            # Keep name and role in sync with Azure AD
+            user.name = name
+            user.role = role
+            db.commit()
+            db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        # Another concurrent request inserted the user just before us
+        user = db.query(User).filter((User.id == oid) | (User.email == email)).first()
         user.name = name
         user.role = role
-    
-    db.commit()
-    db.refresh(user)
+        db.commit()
+        db.refresh(user)
 
     # ── 5. Issue app JWT (identical structure to the password flow) ──────────
     expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)

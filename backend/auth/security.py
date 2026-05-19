@@ -1,12 +1,27 @@
 import os
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
+from jose import jwt
 
-# Secret key to encode the JWT token
-SECRET_KEY = os.getenv("SECRET_KEY", "your-super-secret-key-that-should-be-in-env")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+from dotenv import load_dotenv
+
+# Load .env for local development
+load_dotenv()
+
+# Environment mode: 'development' or 'production'
+APP_ENV = os.getenv("APP_ENV", "development")
+
+# SECRET_KEY must be provided in production. For development, a temporary
+# default is allowed but MUST be changed before deploying.
+SECRET_KEY = os.getenv("SECRET_KEY")
+if APP_ENV == "production" and not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be set in production environment")
+if not SECRET_KEY:
+    SECRET_KEY = "dev-secret-key-change-me"
+
+# JWT config
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 import bcrypt
 

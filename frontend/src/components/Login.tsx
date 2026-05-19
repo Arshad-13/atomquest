@@ -13,7 +13,7 @@ export const Login = () => {
   const { setAuth } = useAppStore();
 
   // ── Password Login (Phase 1 — always available for demo) ──────────────────
-  const onSubmit = async (data: any) => {
+  async function onSubmit(data: any) {
     setServerError(null);
     setIsLoading(true);
     try {
@@ -44,7 +44,7 @@ export const Login = () => {
   };
 
   // ── Phase 10: Azure AD SSO Login ──────────────────────────────────────────
-  const handleSsoLogin = async () => {
+  async function handleSsoLogin() {
     setServerError(null);
     setIsSsoLoading(true);
     try {
@@ -145,7 +145,7 @@ export const Login = () => {
         </form>
 
         <div className="mt-6 text-center text-xs text-gray-400">
-          Demo accounts: employee@ / manager@ / admin@atomquest.com · Password: atomquest123
+          Demo accounts: employee@example.com / manager@example.com / admin@example.com · Password: test1234
         </div>
       </div>
     </div>

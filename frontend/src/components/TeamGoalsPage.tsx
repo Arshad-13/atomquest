@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { apiClient } from '../api/client';
 import { useAppStore } from '../store/useAppStore';
 import { useToastStore } from '../store/useToastStore';
@@ -36,6 +36,19 @@ interface GroupedTeamSheets {
   };
 }
 
+interface EmployeeSummary {
+  id: string;
+  name: string;
+  role: string;
+  total_weightage: number;
+  is_locked: boolean;
+}
+
+interface AnalyticsData {
+  bar_data: Array<Record<string, unknown>>;
+  heatmap_data: Array<Record<string, unknown>>;
+}
+
 export const TeamGoalsPage = () => {
   const { user } = useAppStore();
   const { addToast } = useToastStore();
@@ -43,8 +56,8 @@ export const TeamGoalsPage = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all' | 'analytics'>('pending');
   const [rawGoals, setRawGoals] = useState<TeamGoal[]>([]);
-  const [directReports, setDirectReports] = useState<any[]>([]);
-  const [analyticsData, setAnalyticsData] = useState<{ bar_data: any[], heatmap_data: any[] } | null>(null);
+  const [directReports, setDirectReports] = useState<EmployeeSummary[]>([]);
+  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
   const [expandedEmployees, setExpandedEmployees] = useState<{ [key: string]: boolean }>({});
   
   // Inline editing state tracking: maps goalId -> { target, weightage }
@@ -59,11 +72,7 @@ export const TeamGoalsPage = () => {
   // New state for Shared Goal Modal
   const [sharedModalOpen, setSharedModalOpen] = useState(false);
 
-  useEffect(() => {
-    fetchTeamGoals();
-  }, [user?.id]);
-
-  const fetchTeamGoals = async () => {
+  const fetchTeamGoals = useCallback(async () => {
     if (!user?.id) return;
     try {
       // Run fetches in parallel
@@ -72,15 +81,15 @@ export const TeamGoalsPage = () => {
         apiClient.get(`/managers/${user.id}/analytics`).catch(() => ({ data: null })), // Graceful fail if no data
         apiClient.get(`/managers/${user.id}/team`).catch(() => ({ data: [] }))
       ]);
-      
+
       setRawGoals(teamRes.data);
       setDirectReports(reportsRes.data);
-      
+
       // Inject the analytics data into state if it exists
       if (analyticsRes.data) {
         setAnalyticsData(analyticsRes.data);
       }
-      
+
       // Initialize inline edit fields with existing values
       const initialEdits: typeof inlineEdits = {};
       teamRes.data.forEach((g: TeamGoal) => {
@@ -96,13 +105,18 @@ export const TeamGoalsPage = () => {
         }
       });
       setExpandedEmployees(initialExpansion);
-      
-    } catch (err) {
+    } catch {
       addToast("Failed to retrieve team performance profiles.", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user, addToast]);
+
+  useEffect(() => {
+    // This effect intentionally hydrates local view state from the team-goals API on mount and refresh.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchTeamGoals();
+  }, [fetchTeamGoals]);
 
   const handleInlineChange = (goalId: number, field: 'target' | 'weightage', value: number) => {
     setInlineEdits(prev => ({
@@ -120,11 +134,13 @@ export const TeamGoalsPage = () => {
 
   // --- Core Workflows ---
 
-  const handleApproveSheet = async (_employeeId: string, goals: TeamGoal[]) => {
+  async function handleApproveSheet(_employeeId: string, goals: TeamGoal[]) {
     setSubmittingAction(true);
     try {
-      // Calculate total allocated weightage including current inline edits
-      const computedTotalWeightage = goals.reduce((sum, g) => {
+      const fullSheetGoals = allGroupedSheets[_employeeId]?.goals || goals;
+
+      // Calculate total allocated weightage across the employee's full sheet, including current inline edits
+      const computedTotalWeightage = fullSheetGoals.reduce((sum, g) => {
         const edit = inlineEdits[g.id];
         return sum + (edit ? edit.weightage : g.weightage);
       }, 0);
@@ -151,7 +167,7 @@ export const TeamGoalsPage = () => {
 
       addToast("Objective sheet validated, authorized, and locked.", "success");
       fetchTeamGoals();
-    } catch (err) {
+    } catch {
       addToast("Failed to process sheet authorization.", "error");
     } finally {
       setSubmittingAction(false);
@@ -164,7 +180,7 @@ export const TeamGoalsPage = () => {
     setReturnModalOpen(true);
   };
 
-  const handleConfirmReturn = async () => {
+  async function handleConfirmReturn() {
     if (!returnComment.trim() || !targetEmployeeId) {
       addToast("A rejection/rework diagnostic comment is required.", "error");
       return;
@@ -173,17 +189,22 @@ export const TeamGoalsPage = () => {
     try {
       const employeeGoalsToReturn = rawGoals.filter(g => g.owner.id === targetEmployeeId && !g.is_locked && g.status === 'submitted');
       
-      // Call Phase 2 Endpoint to cycle status from submitted -> draft with documentation
+      // Call Phase 2 Endpoint to cycle status from submitted -> draft/returned with documentation and updated params
       await Promise.all(
-        employeeGoalsToReturn.map(g => 
-          apiClient.post(`/goals/${g.id}/return`, { comment: returnComment })
-        )
+        employeeGoalsToReturn.map(g => {
+          const edits = inlineEdits[g.id] || { target: g.target, weightage: g.weightage };
+          return apiClient.post(`/goals/${g.id}/return`, { 
+            comment: returnComment,
+            target: edits.target,
+            weightage: edits.weightage
+          });
+        })
       );
 
       addToast("Goal sheet returned to employee for structural correction.", "success");
       setReturnModalOpen(false);
       fetchTeamGoals();
-    } catch (err) {
+    } catch {
       addToast("Failed to reject target objective sheet.", "error");
     } finally {
       setSubmittingAction(false);
@@ -198,7 +219,19 @@ export const TeamGoalsPage = () => {
     return true; // 'all'
   });
 
-  // Regroup flat dataset back into specific per-employee structures
+  // Regroup the full dataset so sheet totals stay accurate even when the pending tab only shows a subset.
+  const allGroupedSheets: GroupedTeamSheets = {};
+  rawGoals.forEach(goal => {
+    if (!allGroupedSheets[goal.owner.id]) {
+      allGroupedSheets[goal.owner.id] = {
+        employee: goal.owner,
+        goals: []
+      };
+    }
+    allGroupedSheets[goal.owner.id].goals.push(goal);
+  });
+
+  // Regroup the filtered dataset for the current tab's visible rows.
   const groupedSheets: GroupedTeamSheets = {};
   filteredGoals.forEach(goal => {
     if (!groupedSheets[goal.owner.id]) {
@@ -313,11 +346,11 @@ export const TeamGoalsPage = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {analyticsData.heatmap_data.map((emp) => (
+                    {analyticsData.heatmap_data.map((emp: any) => (
                       <tr key={emp.name} className="border-b border-gray-50 dark:border-gray-800/50">
                         <td className="p-3 text-sm font-medium text-gray-900 dark:text-gray-200">{emp.name}</td>
                         {['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
-                          const val = emp[q];
+                          const val = emp[q] as number;
                           // Heatmap Color Logic
                           let bgColor = 'bg-gray-100 dark:bg-gray-800'; // Missing/Zero
                           if (val > 0 && val < 100) bgColor = 'bg-amber-400 dark:bg-amber-500'; // Partial
@@ -361,8 +394,9 @@ export const TeamGoalsPage = () => {
           <div className="space-y-4">
             {Object.values(groupedSheets).map(({ employee, goals }) => {
               const isExpanded = !!expandedEmployees[employee.id];
+              const fullSheetGoals = allGroupedSheets[employee.id]?.goals || goals;
               
-              const liveTotalWeightage = goals.reduce((sum, g) => {
+              const liveTotalWeightage = fullSheetGoals.reduce((sum, g) => {
                 const currentEdit = inlineEdits[g.id];
                 return sum + (currentEdit ? currentEdit.weightage : g.weightage);
               }, 0);

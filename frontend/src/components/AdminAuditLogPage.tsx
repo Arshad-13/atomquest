@@ -34,20 +34,20 @@ export const AdminAuditLogPage = () => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchLogs();
-  }, []);
-
-  const fetchLogs = async () => {
+  async function fetchLogs() {
     try {
       const response = await apiClient.get('/admin/audit-logs');
       setLogs(response.data);
-    } catch (err) {
+    } catch {
       addToast("Failed to retrieve system audit trail.", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }
+
+  useEffect(() => {
+    fetchLogs();
+  }, []);
 
   // --- Filter Logic ---
   const filteredLogs = logs.filter(log => {
