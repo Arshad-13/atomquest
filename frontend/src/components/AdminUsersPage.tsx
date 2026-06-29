@@ -6,6 +6,9 @@ import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
 import { Modal } from './ui/Modal';
+import { Plus, Users, Lock, Edit, Key } from 'lucide-react';
+
+
 
 interface UserDirectoryEntry {
   id: string;
@@ -166,8 +169,8 @@ export const AdminUsersPage = () => {
           <p className="text-gray-500 dark:text-gray-400 mt-1">Manage active corporate directories and securely provision new local login credentials.</p>
         </div>
         
-        <Button variant="primary" onClick={handleOpenModal}>
-          ➕ Add New Employee
+        <Button variant="primary" className="flex items-center gap-1.5" onClick={handleOpenModal}>
+          <Plus className="w-4 h-4" /> Add New Employee
         </Button>
       </div>
 
@@ -209,7 +212,7 @@ export const AdminUsersPage = () => {
       {/* Main Directory Table */}
       <Card className="overflow-hidden">
         {filteredUsers.length === 0 ? (
-          <EmptyState icon="👥" title="No directory entries found" description="There are currently no accounts matching your search or filters." />
+          <EmptyState icon={<Users className="w-8 h-8 text-indigo-500" />} title="No directory entries found" description="There are currently no accounts matching your search or filters." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -237,7 +240,7 @@ export const AdminUsersPage = () => {
                       {/* Employee Details */}
                       <td className="p-4 pl-6">
                         <p className="font-semibold text-gray-900 dark:text-gray-100 text-sm">{u.name}</p>
-                        <p className="text-xs text-gray-500">{u.email}</p>
+                        <p className="text-xs text-gray-550">{u.email}</p>
                       </td>
 
                       {/* Account Role Badge */}
@@ -268,12 +271,22 @@ export const AdminUsersPage = () => {
 
                       {/* Sheet lock status */}
                       <td className="p-4 text-center">
-                        <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded ${
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded ${
                           u.is_locked 
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
                             : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
                         }`}>
-                          {u.is_locked ? '🔒 Approved' : '📝 In Progress'}
+                          {u.is_locked ? (
+                            <>
+                              <Lock className="w-3 h-3 text-green-500 dark:text-green-400" />
+                              Approved
+                            </>
+                          ) : (
+                            <>
+                              <Edit className="w-3 h-3 text-amber-500 dark:text-amber-400" />
+                              In Progress
+                            </>
+                          )}
                         </span>
                       </td>
 
@@ -286,9 +299,9 @@ export const AdminUsersPage = () => {
                       <td className="p-4 pr-6 text-right">
                         <button
                           onClick={() => handleOpenResetModal(u)}
-                          className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 border border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-900/10 px-2.5 py-1 rounded transition-colors"
+                          className="inline-flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 border border-amber-200 dark:border-amber-900/40 bg-amber-50/50 dark:bg-amber-900/10 px-2.5 py-1 rounded transition-colors"
                         >
-                          🔑 Reset Password
+                          <Key className="w-3 h-3" /> Reset Password
                         </button>
                       </td>
 

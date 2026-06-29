@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -15,8 +16,8 @@ export const Modal = ({ isOpen, onClose, title, children }: ModalProps) => {
       <div className="bg-surface-light dark:bg-surface-dark w-full max-w-lg rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200 dark:border-gray-800">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
-            ✕
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors flex items-center justify-center">
+            <X className="w-4 h-4" />
           </button>
         </div>
         <div className="p-6">

@@ -6,6 +6,8 @@ import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
 import { Modal } from './ui/Modal';
+import { Lock, Unlock, RotateCw, Folder, FolderOpen, X } from 'lucide-react';
+
 
 interface LockedGoal {
   id: number;
@@ -189,19 +191,19 @@ export const AdminLockedGoalsPage = () => {
       <div className="flex border-b border-gray-200 dark:border-gray-800">
         <button 
           onClick={() => { setActiveTab('locked'); setSearchTerm(""); }}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'locked' ? 'border-red-600 text-red-600 dark:text-red-400' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          🔒 Locked Goals Override ({goals.length})
+          <Lock className="w-4 h-4" /> Locked Goals Override ({goals.length})
         </button>
         <button 
           onClick={() => { setActiveTab('shared'); setSearchTerm(""); }}
-          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all ${
+          className={`py-3 px-6 text-sm font-semibold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'shared' ? 'border-red-600 text-red-600 dark:text-red-400' : 'border-transparent text-gray-400 hover:text-gray-600'
           }`}
         >
-          🔄 Pushed Shared Goals ({sharedGoals.length})
+          <RotateCw className="w-4 h-4" /> Pushed Shared Goals ({sharedGoals.length})
         </button>
       </div>
 
@@ -221,7 +223,7 @@ export const AdminLockedGoalsPage = () => {
                 />
                 <div className="relative w-10 h-5 bg-gray-250 dark:bg-gray-800 rounded-full peer peer-focus:ring-2 peer-focus:ring-red-500 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all dark:after:bg-gray-100 peer-checked:bg-red-600"></div>
                 <span className="text-sm font-bold text-gray-700 dark:text-gray-350 flex items-center gap-1.5">
-                  📁 Group Goals by Employee
+                  <Folder className="w-4 h-4 text-indigo-500" /> Group Goals by Employee
                   <span className="text-xs font-normal text-gray-400 dark:text-gray-500">(Organised Folder View)</span>
                 </span>
               </label>
@@ -251,7 +253,7 @@ export const AdminLockedGoalsPage = () => {
         <div>
           {filteredLockedGoals.length === 0 ? (
             <Card className="p-6">
-              <EmptyState icon="🔒" title="No locked goals found" description="There are currently no locked goals matching your search." />
+              <EmptyState icon={<Lock className="w-8 h-8 text-red-500" />} title="No locked goals found" description="There are currently no locked goals matching your search." />
             </Card>
           ) : groupByEmployee ? (
             
@@ -272,7 +274,7 @@ export const AdminLockedGoalsPage = () => {
                       className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 cursor-pointer bg-white dark:bg-surface-dark hover:bg-gray-50/50 dark:hover:bg-gray-800/10 select-none"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-2xl leading-none">{isOpen ? '📂' : '📁'}</span>
+                        {isOpen ? <FolderOpen className="w-6 h-6 text-indigo-500" /> : <Folder className="w-6 h-6 text-indigo-400" />}
                         <div>
                           <h3 className="font-bold text-gray-900 dark:text-gray-100 text-sm sm:text-base flex items-center gap-2">
                             {emp.name}
@@ -286,8 +288,8 @@ export const AdminLockedGoalsPage = () => {
 
                       {/* Stat Indicators */}
                       <div className="flex items-center gap-3.5 pl-9 sm:pl-0">
-                        <span className="text-xs font-bold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800/40 px-2.5 py-1 rounded-full uppercase tracking-wider">
-                          🔒 {emp.goals.length} Locked Goals
+                        <span className="text-xs font-bold bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400 border border-red-200 dark:border-red-800/40 px-2.5 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> {emp.goals.length} Locked Goals
                         </span>
                         
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider ${
@@ -335,10 +337,10 @@ export const AdminLockedGoalsPage = () => {
                                   <Button 
                                     variant="danger" 
                                     size="sm" 
-                                    className="text-[11px] font-bold px-2.5 py-1"
+                                    className="text-[11px] font-bold px-2.5 py-1 flex items-center gap-1 ml-auto"
                                     onClick={() => handleOpenUnlock(goal)}
                                   >
-                                    🔓 Force Unlock
+                                    <Unlock className="w-3 h-3" /> Force Unlock
                                   </Button>
                                 </td>
                               </tr>
@@ -383,8 +385,8 @@ export const AdminLockedGoalsPage = () => {
                           <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{goal.weightage}%</span>
                         </td>
                         <td className="p-4 pr-6 text-right">
-                          <Button variant="danger" size="sm" onClick={() => handleOpenUnlock(goal)}>
-                            🔓 Force Unlock
+                          <Button variant="danger" size="sm" className="flex items-center gap-1.5 ml-auto" onClick={() => handleOpenUnlock(goal)}>
+                            <Unlock className="w-3.5 h-3.5" /> Force Unlock
                           </Button>
                         </td>
                       </tr>
@@ -399,7 +401,7 @@ export const AdminLockedGoalsPage = () => {
         /* SHARED GOALS SECTION */
         <Card className="overflow-hidden border-red-100 dark:border-red-900/30">
           {filteredSharedGoals.length === 0 ? (
-            <EmptyState icon="🔄" title="No shared goals found" description="There are currently no pushed shared goals active in the system." />
+            <EmptyState icon={<RotateCw className="w-8 h-8 text-indigo-500" />} title="No shared goals found" description="There are currently no pushed shared goals active in the system." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -434,8 +436,8 @@ export const AdminLockedGoalsPage = () => {
                         <span className="text-sm font-bold text-gray-900 dark:text-gray-100">{sg.weightage}%</span>
                       </td>
                       <td className="p-4 pr-6 text-right">
-                        <Button variant="danger" size="sm" onClick={() => handleOpenCancel(sg)}>
-                          ❌ Cancel & Revert
+                        <Button variant="danger" size="sm" className="flex items-center gap-1.5 ml-auto" onClick={() => handleOpenCancel(sg)}>
+                          <X className="w-3.5 h-3.5" /> Cancel & Revert
                         </Button>
                       </td>
                     </tr>

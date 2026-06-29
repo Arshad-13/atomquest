@@ -124,7 +124,11 @@ export const ApprovalsPage = () => {
         <div className="flex justify-center items-center h-64"><Spinner className="w-8 h-8 text-primary-600" /></div>
       ) : checkIns.length === 0 ? (
         <EmptyState 
-          icon="📋"
+          icon={
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          }
           title={`No data submitted for ${selectedQuarter}`}
           description={`None of your team members have logged performance metrics inside the active ${selectedQuarter} tracking window yet.`}
         />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useToastStore } from '../store/useToastStore';
+import { useAppStore } from '../store/useAppStore';
 import { Card } from './ui/Card';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
@@ -8,8 +9,10 @@ import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
+import { BarChart3 } from 'lucide-react';
 
 interface QoQTrend {
+
   quarter: string;
   Engineering: number;
   Management: number;
@@ -41,8 +44,17 @@ const METRIC_COLORS = ['#6366f1', '#a855f7', '#ec4899', '#14b8a6', '#f59e0b', '#
 
 export const AdminAnalyticsPage = () => {
   const { addToast } = useToastStore();
+  const { theme } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState<ExecutiveAnalytics | null>(null);
+
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#334155' : '#e5e7eb';
+  const textColor = isDark ? '#94a3b8' : '#6b7280';
+  const labelColor = isDark ? '#cbd5e1' : '#4b5563';
+  const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+  const tooltipBorder = isDark ? '#475569' : '#e2e8f0';
+  const tooltipText = isDark ? '#f8fafc' : '#0f172a';
 
   useEffect(() => {
     async function fetchExecutiveMetrics() {
@@ -64,7 +76,7 @@ export const AdminAnalyticsPage = () => {
   }
 
   if (!analytics) {
-    return <EmptyState icon="📊" title="Analytics Pipeline Down" description="Unable to connect with the structural processing cluster data models." />;
+    return <EmptyState icon={<BarChart3 className="w-8 h-8" />} title="Analytics Pipeline Down" description="Unable to connect with the structural processing cluster data models." />;
   }
 
   return (
@@ -90,10 +102,10 @@ export const AdminAnalyticsPage = () => {
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={analytics.qoq_trends} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="quarter" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(val) => `${val}%`} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="quarter" tick={{ fill: textColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(val) => `${val}%`} tick={{ fill: textColor, fontSize: 11 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                 <Line type="monotone" dataKey="Engineering" stroke="#6366f1" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                 <Line type="monotone" dataKey="Management" stroke="#a855f7" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -123,7 +135,7 @@ export const AdminAnalyticsPage = () => {
                       <Cell key={`cell-${index}`} fill={METRIC_COLORS[index % METRIC_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -151,10 +163,10 @@ export const AdminAnalyticsPage = () => {
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analytics.uom_breakdown} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="name" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="name" tick={{ fill: textColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: textColor, fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                 <Bar dataKey="count" fill="#a855f7" radius={[4, 4, 0, 0]} barSize={32} />
               </BarChart>
             </ResponsiveContainer>
@@ -170,10 +182,10 @@ export const AdminAnalyticsPage = () => {
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analytics.manager_effectiveness} layout="vertical" margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#e5e7eb" />
-                <XAxis type="number" domain={[0, 100]} tickFormatter={(val) => `${val}%`} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="name" type="category" tick={{ fill: '#4b5563', fontSize: 11, fontWeight: 500 }} width={90} axisLine={false} tickLine={false} />
-                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke={gridColor} />
+                <XAxis type="number" domain={[0, 100]} tickFormatter={(val) => `${val}%`} tick={{ fill: textColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis dataKey="name" type="category" tick={{ fill: labelColor, fontSize: 11, fontWeight: 500 }} width={90} axisLine={false} tickLine={false} />
+                <Tooltip cursor={{ fill: 'transparent' }} contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                 <Bar dataKey="completionRate" name="Team Log Compliance Rate" fill="#14b8a6" radius={[0, 4, 4, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>

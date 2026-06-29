@@ -2,6 +2,10 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
+import contextvars
+
+current_user_id = contextvars.ContextVar("current_user_id", default=None)
+
 
 load_dotenv()
 
@@ -17,10 +21,22 @@ connect_args = {}
 if "supabase.co" in SQLALCHEMY_DATABASE_URL and "sslmode=" not in SQLALCHEMY_DATABASE_URL:
     connect_args["sslmode"] = "require"
 
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "connect_args": connect_args
+}
+
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://") or "postgres" in SQLALCHEMY_DATABASE_URL:
+    engine_kwargs.update({
+        "pool_size": 20,
+        "max_overflow": 10,
+        "pool_timeout": 30,
+        "pool_recycle": 1800
+    })
+
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
-    pool_pre_ping=True,
-    connect_args=connect_args
+    **engine_kwargs
 )
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

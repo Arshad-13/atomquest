@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/useAppStore';
+import { Sun, Moon } from 'lucide-react';
 
 export const Topbar = () => {
   const { theme, toggleTheme, user } = useAppStore();
@@ -23,11 +24,16 @@ export const Topbar = () => {
         {/* Theme Toggle */}
         <button 
           onClick={toggleTheme}
-          className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
+          className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 flex items-center justify-center"
           title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
         >
-          {theme === 'light' ? '🌙' : '☀️'}
+          {theme === 'light' ? (
+            <Moon className="w-4 h-4 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200" />
+          ) : (
+            <Sun className="w-4 h-4 text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300" />
+          )}
         </button>
+
 
         {/* Vertical Divider */}
         <div className="w-px h-6 bg-gray-200 dark:bg-gray-700"></div>

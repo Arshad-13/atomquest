@@ -8,6 +8,9 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
+import { ConfirmModal } from './ui/ConfirmModal';
+import { ClipboardList } from 'lucide-react';
+
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis 
@@ -28,13 +31,23 @@ interface Goal {
 }
 
 export const EmployeeDashboard = () => {
-  const { user } = useAppStore();
+  const { user, theme } = useAppStore();
   const { addToast } = useToastStore();
+  
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#334155' : '#e5e7eb';
+  const textColor = isDark ? '#94a3b8' : '#6b7280';
+  const labelColor = isDark ? '#cbd5e1' : '#4b5563';
+  const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+  const tooltipBorder = isDark ? '#475569' : '#e2e8f0';
+  const tooltipText = isDark ? '#f8fafc' : '#0f172a';
   
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'goals' | 'analytics'>('goals');
   const [goals, setGoals] = useState<Goal[]>([]);
   const [processingId, setProcessingId] = useState<number | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [goalIdToDelete, setGoalIdToDelete] = useState<number | null>(null);
   
   // Analytics State
   const [analyticsData, setAnalyticsData] = useState<{ line_data: any[], radar_data: any[] } | null>(null);
@@ -70,14 +83,24 @@ export const EmployeeDashboard = () => {
     } catch { addToast("Failed to submit.", "error"); } finally { setProcessingId(null); }
   };
 
-  async function deleteGoal(goalId: number) {
-    if (!window.confirm("Are you sure?")) return;
-    setProcessingId(goalId);
+  const deleteGoal = (goalId: number) => {
+    setGoalIdToDelete(goalId);
+    setDeleteConfirmOpen(true);
+  };
+
+  async function executeDeleteGoal() {
+    if (goalIdToDelete === null) return;
+    setProcessingId(goalIdToDelete);
     try {
-      await apiClient.delete(`/goals/${goalId}`);
+      await apiClient.delete(`/goals/${goalIdToDelete}`);
       addToast("Goal deleted.", "success");
       fetchDashboardData();
-    } catch { addToast("Failed to delete.", "error"); } finally { setProcessingId(null); }
+    } catch {
+      addToast("Failed to delete.", "error");
+    } finally {
+      setProcessingId(null);
+      setGoalIdToDelete(null);
+    }
   };
 
   const formatUoM = (uom: string) => {
@@ -128,7 +151,7 @@ export const EmployeeDashboard = () => {
       {activeTab === 'goals' && (
         <Card className="overflow-hidden">
           {goals.length === 0 ? (
-            <EmptyState icon="📋" title="No goals found" description="You haven't added any goals to your sheet yet." action={<Link to="/goals/new"><Button variant="primary" className="mt-4">Draft First Goal</Button></Link>} />
+            <EmptyState icon={<ClipboardList className="w-8 h-8 text-indigo-500" />} title="No goals found" description="You haven't added any goals to your sheet yet." action={<Link to="/goals/new"><Button variant="primary" className="mt-4">Draft First Goal</Button></Link>} />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -160,7 +183,15 @@ export const EmployeeDashboard = () => {
                             <>
                               <Link to={`/goals/${goal.id}/edit`}><Button variant="secondary" size="sm">Edit</Button></Link>
                               <Button variant="primary" size="sm" isLoading={processingId === goal.id} onClick={() => submitGoalForApproval(goal.id)}>Submit</Button>
-                              <button onClick={() => deleteGoal(goal.id)} className="p-1.5 text-gray-400 hover:text-red-600">🗑️</button>
+                              <button 
+                                onClick={() => deleteGoal(goal.id)} 
+                                className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                title="Delete Goal"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
                             </>
                           )}
                           {(!goal.is_locked && goal.status === 'returned') && (
@@ -196,10 +227,10 @@ export const EmployeeDashboard = () => {
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={analyticsData.line_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                    <XAxis dataKey="quarter" tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis tickFormatter={(tick) => `${tick}%`} tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 100]} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '13px' }} />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                    <XAxis dataKey="quarter" tick={{ fill: textColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis tickFormatter={(tick) => `${tick}%`} tick={{ fill: textColor, fontSize: 12 }} axisLine={false} tickLine={false} domain={[0, 100]} />
+                    <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', fontSize: '13px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                     <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
                     {lineChartKeys.map((key, index) => (
                       <Line key={key} type="monotone" dataKey={key} stroke={colors[index % colors.length]} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -222,11 +253,11 @@ export const EmployeeDashboard = () => {
               <div className="h-[350px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <RadarChart cx="50%" cy="50%" outerRadius="70%" data={analyticsData.radar_data}>
-                    <PolarGrid stroke="#e5e7eb" />
-                    <PolarAngleAxis dataKey="subject" tick={{ fill: '#4b5563', fontSize: 11 }} />
-                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 10, fill: '#9ca3af' }} />
+                    <PolarGrid stroke={gridColor} />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: labelColor, fontSize: 11 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 10, fill: textColor }} />
                     <Radar name="Your Score" dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.4} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                    <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} />
                   </RadarChart>
                 </ResponsiveContainer>
               </div>
@@ -236,6 +267,15 @@ export const EmployeeDashboard = () => {
         </div>
       )}
 
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={executeDeleteGoal}
+        title="Delete Goal"
+        message="Are you sure you want to delete this goal? This action is permanent and cannot be undone."
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 };

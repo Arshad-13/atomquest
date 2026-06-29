@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { apiClient } from './api/client';
 import { useAppStore } from './store/useAppStore';
+import { REQUIRED_ROLES } from './utils/authConstants';
 
+// Layout & Auth Gatekeepers
 
 // Layout & Auth Gatekeepers
 import { AppLayout } from './components/layout/AppLayout';
@@ -10,6 +12,7 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RoleGate } from './components/auth/RoleGate';
 
 // Components
+import { Homepage } from './components/Homepage';
 import { Login } from './components/Login';
 import { EmployeeDashboard } from './components/EmployeeDashboard';
 import { GoalForm } from './components/GoalForm';
@@ -28,22 +31,33 @@ import { AdminEscalationPage } from './components/AdminEscalationPage';
 import { AdminUsersPage } from './components/AdminUsersPage';
 
 function App() {
-  const { user, token, setAuth, logout } = useAppStore();
+  const { user, token, setAuth, logout, theme } = useAppStore();
   const [isInitializing, setIsInitializing] = useState(true);
+
+  // Enforce dark mode class on the HTML document globally
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
 
   // JWT session hydration on reload
   useEffect(() => {
     const initializeAuth = async () => {
-      if (token && !user) {
-        try {
-          const response = await apiClient.get('/auth/me');
-          setAuth(response.data, token);
-        } catch { logout(); }
+      try {
+        const response = await apiClient.get('/auth/me');
+        const currentToken = token || localStorage.getItem('zenithokr_token') || 'session';
+        setAuth(response.data, currentToken);
+      } catch { 
+        logout(); 
+      } finally {
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     };
     initializeAuth();
-  }, [token, user, setAuth, logout]);
+  }, [setAuth, logout]);
 
   if (isInitializing) {
     return <div className="min-h-screen flex items-center justify-center bg-background-light dark:bg-background-dark text-primary-600">Loading Workspace...</div>;
@@ -54,14 +68,12 @@ function App() {
     <ToastContainer />
       <Routes>
         {/* Public Routes */}
+        <Route path="/" element={<Homepage />} />
         <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
 
         {/* Protected App Shell */}
         <Route element={<ProtectedRoute />}>
           <Route element={<AppLayout />}>
-            
-            {/* Base Redirect */}
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
             {/* Core Routes (All Authenticated Users) */}
             <Route path="/dashboard" element={<DashboardPage />} />
@@ -73,48 +85,48 @@ function App() {
 
             {/* Manager+ Routes */}
             <Route path="/team" element={
-              <RoleGate allowedRoles={['manager', 'admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.MANAGER_OR_ADMIN}>
                 <TeamGoalsPage /> 
               </RoleGate>
             } />
             {/* Admin+ Routes */}
             <Route path="/approvals" element={
-              <RoleGate allowedRoles={['manager', 'admin']}>
-                  <ApprovalsPage /> 
+              <RoleGate allowedRoles={REQUIRED_ROLES.MANAGER_OR_ADMIN}>
+                   <ApprovalsPage /> 
               </RoleGate>
             } />
             <Route path="/admin/cycles" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <CycleConfigPage /> 
               </RoleGate>
             } />
             <Route path="/admin/reports" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <ReportsPage />
               </RoleGate>
             } />
             <Route path="/admin/audit" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <AdminAuditLogPage />
               </RoleGate>
             } />
             <Route path="/admin/overrides" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <AdminLockedGoalsPage />
               </RoleGate>
             } />
             <Route path="/admin/analytics" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <AdminAnalyticsPage />
               </RoleGate>
             } />
             <Route path="/admin/escalation" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <AdminEscalationPage />
               </RoleGate>
             } />
             <Route path="/admin/users" element={
-              <RoleGate allowedRoles={['admin']}>
+              <RoleGate allowedRoles={REQUIRED_ROLES.ADMIN_ONLY}>
                 <AdminUsersPage />
               </RoleGate>
             } />

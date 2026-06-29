@@ -5,9 +5,9 @@ import './index.css'
 import { MsalProvider } from '@azure/msal-react';
 import { msalInstance } from './msalInstance';
 import { useAppStore } from './store/useAppStore';
-import axios from 'axios';
+import { apiClient } from './api/client';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+import { ErrorBoundary } from './components/ErrorBoundary.tsx'
 
 msalInstance.initialize().then(async () => {
   // 1. Restore active account from session storage
@@ -21,17 +21,13 @@ msalInstance.initialize().then(async () => {
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult?.accessToken) {
       // Exchange the MSAL token for our app's JWT
-      const azureRes = await axios.post(
-        `${API_URL}/auth/azure`,
+      await apiClient.post(
+        '/auth/azure',
         { access_token: redirectResult.accessToken }
       );
-      const appToken = azureRes.data.access_token;
-      const meRes = await axios.get(
-        `${API_URL}/auth/me`,
-        { headers: { Authorization: `Bearer ${appToken}` } }
-      );
+      const meRes = await apiClient.get('/auth/me');
       // Store auth state before React renders — app will boot into dashboard
-      useAppStore.getState().setAuth(meRes.data, appToken);
+      useAppStore.getState().setAuth(meRes.data, 'session');
     }
   } catch (err) {
     console.error('[SSO] Redirect token exchange failed:', err);
@@ -41,7 +37,9 @@ msalInstance.initialize().then(async () => {
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
       <MsalProvider instance={msalInstance}>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </MsalProvider>
     </React.StrictMode>,
   );

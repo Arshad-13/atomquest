@@ -8,6 +8,8 @@ import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
 import { Modal } from './ui/Modal';
+import { Rocket, Users } from 'lucide-react';
+
 import { SharedGoalModal } from './SharedGoalModal';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -50,8 +52,16 @@ interface AnalyticsData {
 }
 
 export const TeamGoalsPage = () => {
-  const { user } = useAppStore();
+  const { user, theme } = useAppStore();
   const { addToast } = useToastStore();
+
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#334155' : '#e5e7eb';
+  const textColor = isDark ? '#94a3b8' : '#6b7280';
+  const labelColor = isDark ? '#cbd5e1' : '#4b5563';
+  const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+  const tooltipBorder = isDark ? '#475569' : '#e2e8f0';
+  const tooltipText = isDark ? '#f8fafc' : '#0f172a';
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'pending' | 'approved' | 'all' | 'analytics'>('pending');
@@ -291,8 +301,8 @@ export const TeamGoalsPage = () => {
         </div>
         
         <div className="pb-2">
-          <Button variant="primary" size="sm" onClick={() => setSharedModalOpen(true)}>
-            🚀 Push Shared Goal
+          <Button variant="primary" size="sm" className="flex items-center gap-1.5" onClick={() => setSharedModalOpen(true)}>
+            <Rocket className="w-3.5 h-3.5" /> Push Shared Goal
           </Button>
         </div>
       </div>
@@ -314,10 +324,10 @@ export const TeamGoalsPage = () => {
               <div className="h-[300px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analyticsData.bar_data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e5e7eb" />
-                    <XAxis type="number" domain={[0, 100]} tick={{ fill: '#6b7280', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <YAxis dataKey="name" type="category" tick={{ fill: '#4b5563', fontSize: 12, fontWeight: 500 }} width={100} axisLine={false} tickLine={false} />
-                    <Tooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '13px' }} cursor={{fill: 'transparent'}} />
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke={gridColor} />
+                    <XAxis type="number" domain={[0, 100]} tick={{ fill: textColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: labelColor, fontSize: 12, fontWeight: 500 }} width={100} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }} labelStyle={{ color: tooltipText }} cursor={{fill: 'transparent'}} />
                     <Bar dataKey="avgScore" name="Average Score %" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={24} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -386,7 +396,7 @@ export const TeamGoalsPage = () => {
       {activeTab !== 'analytics' && (
         Object.keys(groupedSheets).length === 0 ? (
           <EmptyState 
-            icon="👥"
+            icon={<Users className="w-8 h-8 text-indigo-500" />}
             title={`No targets match your query`}
             description={`There are currently no employee goal sheets assigned to the "${activeTab}" validation cycle.`}
           />

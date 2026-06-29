@@ -113,23 +113,30 @@ export const CycleConfigPage = () => {
 
       {/* Active Status Banner */}
       {activeCycle ? (
-        <div className="bg-green-50 border border-green-200 dark:bg-green-900/20 dark:border-green-800/50 p-4 rounded-xl flex items-center gap-4">
-          <div className="text-2xl">🟢</div>
+        <div className="bg-emerald-50/50 border border-emerald-150 dark:bg-emerald-950/10 dark:border-emerald-900/40 p-4 rounded-xl flex items-center gap-4">
+          <div className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+          </div>
           <div>
-            <h4 className="font-semibold text-green-900 dark:text-green-100">
+            <h4 className="font-semibold text-emerald-900 dark:text-emerald-200">
               System is currently unlocked for: {PERIODS.find(p => p.key === activeCycle.period_name)?.label || activeCycle.period_name}
             </h4>
-            <p className="text-sm text-green-700 dark:text-green-300">
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
               Closes automatically on {new Date(activeCycle.close_date).toLocaleDateString()}
             </p>
           </div>
         </div>
       ) : (
-        <div className="bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/50 p-4 rounded-xl flex items-center gap-4">
-          <div className="text-2xl">⏸️</div>
+        <div className="bg-amber-50/50 border border-amber-150 dark:bg-amber-950/10 dark:border-amber-900/40 p-4 rounded-xl flex items-center gap-4">
+          <div className="p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded-lg text-amber-600 dark:text-amber-400">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
           <div>
-            <h4 className="font-semibold text-amber-900 dark:text-amber-100">System is currently locked</h4>
-            <p className="text-sm text-amber-700 dark:text-amber-300">No active window is configured. Employees cannot submit goals or check-ins.</p>
+            <h4 className="font-semibold text-amber-900 dark:text-amber-200">System is currently locked</h4>
+            <p className="text-sm text-amber-700 dark:text-amber-400">No active window is configured. Employees cannot submit goals or check-ins.</p>
           </div>
         </div>
       )}

@@ -7,6 +7,8 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
+import { AlertTriangle, BarChart3 } from 'lucide-react';
+
 
 // --- Types ---
 interface Goal {
@@ -123,7 +125,7 @@ export const GoalDetailPage = () => {
       {/* Rejection Callout */}
       {goal.status === 'returned' && latestReturn && (
         <div className="bg-red-50 border border-red-200 dark:bg-red-900/10 dark:border-red-900/30 p-5 rounded-xl flex items-start gap-4">
-          <div className="text-2xl mt-1">⚠️</div>
+          <AlertTriangle className="w-5 h-5 text-red-500 mt-1 flex-shrink-0" />
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-red-800 dark:text-red-400">Manager Returned for Rework</h3>
             <p className="text-red-700 dark:text-red-300 mt-1">{latestReturn.comment}</p>
@@ -175,7 +177,7 @@ export const GoalDetailPage = () => {
             
             {checkIns.length === 0 ? (
               <EmptyState 
-                icon="📊" 
+                icon={<BarChart3 className="w-8 h-8 text-indigo-500" />} 
                 title="No check-ins yet" 
                 description={goal.is_locked ? "Log your first check-in when the cycle window opens." : "Goal must be approved before you can log progress."} 
               />

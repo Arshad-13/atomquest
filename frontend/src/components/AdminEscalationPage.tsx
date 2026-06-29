@@ -6,6 +6,7 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
+import { Settings, CheckCircle2 } from 'lucide-react';
 
 interface EscalationRule {
   id: number;
@@ -105,7 +106,7 @@ export const AdminEscalationPage = () => {
       {activeTab === 'rules' && (
         <Card className="overflow-hidden">
           {rules.length === 0 ? (
-            <EmptyState icon="⚙️" title="No Rules Configured" description="Escalation rules have not been seeded in the database." />
+            <EmptyState icon={<Settings className="w-8 h-8" />} title="No Rules Configured" description="Escalation rules have not been seeded in the database." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -161,7 +162,7 @@ export const AdminEscalationPage = () => {
       {activeTab === 'logs' && (
         <Card className="overflow-hidden border-red-100 dark:border-red-900/30">
           {logs.length === 0 ? (
-            <EmptyState icon="✅" title="All Clear" description="There are currently no active escalation alerts in the system." />
+            <EmptyState icon={<CheckCircle2 className="w-8 h-8 text-green-500" />} title="All Clear" description="There are currently no active escalation alerts in the system." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse whitespace-nowrap">

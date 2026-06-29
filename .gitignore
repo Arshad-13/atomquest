@@ -16,3 +16,10 @@ frontend/dist/
 # Editor
 .vscode/
 *.log
+
+# Agents
+.agents
+
+# Databases
+*.db
+backend/*.db

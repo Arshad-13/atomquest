@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: atomquest-backend
+    name: zenithokr-backend
     runtime: python
     rootDir: .
     buildCommand: pip install -r requirements.txt && alembic upgrade head
@@ -12,7 +12,7 @@ services:
       - key: SECRET_KEY
         generateValue: true  # Render auto-generates a secure random value
       - key: ALLOWED_ORIGINS
-        sync: false          # Set to your Vercel frontend URL e.g. https://atomquest.vercel.app
+        sync: false          # Set to your Vercel frontend URL e.g. https://zenithokr.vercel.app
       - key: AZURE_TENANT_ID
         sync: false          # Your Azure AD tenant ID
       - key: AZURE_ADMIN_GROUP_ID

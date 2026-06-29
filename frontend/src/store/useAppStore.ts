@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { apiClient } from '../api/client';
 
 interface User {
   id: string;
@@ -20,17 +21,18 @@ export const useAppStore = create<AppState>((set) => ({
   theme: 'light',
   toggleTheme: () => set((state) => ({ theme: state.theme === 'light' ? 'dark' : 'light' })),
   
-  // Real Auth State
+  // Real Auth State (Cookie-driven, token is in-memory only)
   user: null, 
-  token: localStorage.getItem('atomquest_token'), 
+  token: localStorage.getItem('zenithokr_token'), 
   
   setAuth: (user, token) => {
-    localStorage.setItem('atomquest_token', token);
+    localStorage.setItem('zenithokr_token', token);
     set({ user, token });
   },
   
   logout: () => {
-    localStorage.removeItem('atomquest_token');
+    localStorage.removeItem('zenithokr_token');
+    apiClient.post('/auth/logout').catch(() => {});
     set({ user: null, token: null });
   },
 }));

@@ -1,7 +1,19 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional, List
 from datetime import datetime
-from models import UoMEnum, StatusEnum, QuarterEnum, RoleEnum
+from models import UoMEnum, StatusEnum, QuarterEnum, RoleEnum, GoalStatusEnum, CyclePeriodEnum
+import re
+
+def validate_password_complexity(v: str) -> str:
+    if len(v) < 8:
+        raise ValueError("Password must be at least 8 characters long")
+    if not re.search(r"[A-Z]", v):
+        raise ValueError("Password must contain at least one uppercase letter")
+    if not re.search(r"\d", v):
+        raise ValueError("Password must contain at least one number")
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", v):
+        raise ValueError("Password must contain at least one special character")
+    return v
 
 class UserCreate(BaseModel):
     name: str
@@ -10,8 +22,18 @@ class UserCreate(BaseModel):
     role: RoleEnum
     manager_id: Optional[str] = None
 
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_complexity(v)
+
 class ResetPasswordRequest(BaseModel):
     password: str
+
+    @field_validator("password")
+    @classmethod
+    def check_password(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 class GoalBase(BaseModel):
     thrust_area: str
@@ -28,7 +50,7 @@ class GoalCreate(GoalBase):
 class GoalResponse(GoalBase):
     id: int
     owner_id: str
-    status: Optional[str] = "draft"
+    status: Optional[GoalStatusEnum] = GoalStatusEnum.DRAFT
     is_locked: bool
     version_id: int
     return_comment: Optional[str] = None
@@ -156,7 +178,7 @@ class SharedGoalAchievementUpdate(BaseModel):
     actual_achievement: float
 
 class CycleWindowBase(BaseModel):
-    period_name: str
+    period_name: CyclePeriodEnum
     open_date: datetime
     close_date: datetime
 

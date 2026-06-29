@@ -1,10 +1,14 @@
 import { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
 import { useToastStore } from '../store/useToastStore';
+import { useAppStore } from '../store/useAppStore';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
+import { TrendingDown, Download } from 'lucide-react';
+
+
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface AchievementRow {
@@ -27,8 +31,16 @@ interface CompletionData {
 
 export const ReportsPage = () => {
   const { addToast } = useToastStore();
+  const { theme } = useAppStore();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'achievement' | 'completion'>('achievement');
+
+  const isDark = theme === 'dark';
+  const gridColor = isDark ? '#334155' : '#e5e7eb';
+  const textColor = isDark ? '#94a3b8' : '#6b7280';
+  const tooltipBg = isDark ? '#1e293b' : '#ffffff';
+  const tooltipBorder = isDark ? '#475569' : '#e2e8f0';
+  const tooltipText = isDark ? '#f8fafc' : '#0f172a';
   
   const [achievementData, setAchievementData] = useState<AchievementRow[]>([]);
   const [completionData, setCompletionData] = useState<CompletionData[]>([]);
@@ -57,9 +69,10 @@ export const ReportsPage = () => {
     setDownloadingCSV(true);
     try {
       // Direct fetch to handle the Blob response correctly
-      const token = localStorage.getItem('atomquest_token');
+      const token = useAppStore.getState().token || localStorage.getItem('zenithokr_token');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/reports/achievement?format=csv`, {
-        headers: { 'Authorization': `Bearer ${token}` }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        credentials: 'include'
       });
       
       if (!response.ok) throw new Error("Export failed");
@@ -116,13 +129,13 @@ export const ReportsPage = () => {
         <Card className="overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/20">
             <h3 className="font-semibold text-gray-900 dark:text-white">Quarterly Objective Achievements</h3>
-            <Button variant="primary" size="sm" onClick={handleDownloadCSV} isLoading={downloadingCSV}>
-              ⬇ Download CSV
+            <Button variant="primary" size="sm" className="flex items-center gap-1.5" onClick={handleDownloadCSV} isLoading={downloadingCSV}>
+              <Download className="w-3.5 h-3.5" /> Download CSV
             </Button>
           </div>
           
           {achievementData.length === 0 ? (
-             <EmptyState icon="📉" title="No check-in data available" description="Achievement data will populate here once employees begin logging quarterly progress." />
+             <EmptyState icon={<TrendingDown className="w-8 h-8 text-indigo-500" />} title="No check-in data available" description="Achievement data will populate here once employees begin logging quarterly progress." />
           ) : (
             <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
               <table className="w-full text-left border-collapse whitespace-nowrap">
@@ -165,12 +178,13 @@ export const ReportsPage = () => {
           <div className="h-[400px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={completionData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                <XAxis dataKey="department" tick={{ fill: '#6b7280' }} axisLine={false} tickLine={false} />
-                <YAxis tickFormatter={(tick) => `${tick}%`} tick={{ fill: '#6b7280' }} axisLine={false} tickLine={false} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
+                <XAxis dataKey="department" tick={{ fill: textColor }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(tick) => `${tick}%`} tick={{ fill: textColor }} axisLine={false} tickLine={false} />
                 <Tooltip 
                   cursor={{ fill: 'transparent' }}
-                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  contentStyle={{ backgroundColor: tooltipBg, borderColor: tooltipBorder, borderRadius: '8px', color: tooltipText }}
+                  labelStyle={{ color: tooltipText }}
                 />
                 <Legend iconType="circle" wrapperStyle={{ paddingTop: '20px' }} />
                 

@@ -6,6 +6,7 @@ import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import { EmptyState } from './ui/EmptyState';
+import { Shield, Settings } from 'lucide-react';
 
 interface AuditLog {
   id: number;
@@ -96,7 +97,7 @@ export const AdminAuditLogPage = () => {
     
     const a = document.createElement('a');
     a.href = url;
-    a.download = `atomquest_audit_log_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `zenithokr_audit_log_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
     
@@ -178,9 +179,8 @@ export const AdminAuditLogPage = () => {
       </Card>
 
       {/* Main Ledger */}
-      <Card className="overflow-hidden">
-        {paginatedLogs.length === 0 ? (
-          <EmptyState icon="🛡️" title="No logs found" description="No audit events match your current filter criteria." />
+      <Card className="overflow-hidden">        {paginatedLogs.length === 0 ? (
+          <EmptyState icon={<Shield className="w-8 h-8" />} title="No logs found" description="No audit events match your current filter criteria." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -200,7 +200,7 @@ export const AdminAuditLogPage = () => {
                     <td className="p-4 pl-6 text-sm text-gray-500 dark:text-gray-400 font-mono">
                       {new Date(log.timestamp).toLocaleString()}
                     </td>
-
+ 
                     <td className="p-4 max-w-xs">
                       {log.goal_id ? (
                         <>
@@ -208,8 +208,9 @@ export const AdminAuditLogPage = () => {
                           <p className="text-xs text-gray-500 font-mono mt-0.5">Goal ID: #{log.goal_id}</p>
                         </>
                       ) : (
-                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-800/60 px-2.5 py-1 rounded">
-                          ⚙️ System Event
+                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider bg-gray-100 dark:bg-gray-800/60 px-2.5 py-1 rounded inline-flex items-center gap-1.5">
+                          <Settings className="w-3.5 h-3.5" />
+                          System Event
                         </span>
                       )}
                     </td>

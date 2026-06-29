@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useToastStore } from '../../store/useToastStore';
+import { X } from 'lucide-react';
 
 export const ToastContainer = () => {
   const { toasts, removeToast, addToast } = useToastStore();
@@ -26,7 +27,9 @@ export const ToastContainer = () => {
           }`}
         >
           <span className="text-sm font-medium">{toast.message}</span>
-          <button onClick={() => removeToast(toast.id)} className="ml-4 opacity-70 hover:opacity-100">✕</button>
+          <button onClick={() => removeToast(toast.id)} className="ml-4 opacity-70 hover:opacity-100 flex items-center justify-center">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       ))}
     </div>

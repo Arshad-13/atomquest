@@ -1,15 +1,44 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Geist:wght@300;400;500;600;700;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --fluid-space-xs: clamp(0.5rem, 1vw, 0.75rem);
+  --fluid-space-sm: clamp(0.75rem, 1.5vw, 1rem);
+  --fluid-space-md: clamp(1rem, 2.5vw, 1.5rem);
+  --fluid-space-lg: clamp(1.5rem, 4vw, 2.5rem);
+  --fluid-space-xl: clamp(2rem, 6vw, 4rem);
+}
+
 @layer base {
   body {
-    @apply bg-background-light text-slate-800 dark:bg-background-dark dark:text-slate-100 transition-colors duration-300;
+    @apply font-sans bg-background-light text-slate-800 dark:bg-background-dark dark:text-slate-100 transition-colors duration-300;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
   }
 }
 
-/* Dynamic Dark Mode Fallbacks - Forces minimum contrast for un-adapted Tailwind classes */
 @layer utilities {
+  .glass-card {
+    @apply bg-surface-dark/80 backdrop-blur-md border border-white/5 rounded-xl shadow-xl;
+  }
+  .btn-scale {
+    @apply transition-all duration-200 active:scale-[0.98];
+  }
+  .scrollbar-dark::-webkit-scrollbar {
+    width: 6px;
+  }
+  .scrollbar-dark::-webkit-scrollbar-track {
+    @apply bg-background-dark;
+  }
+  .scrollbar-dark::-webkit-scrollbar-thumb {
+    @apply bg-gray-800 rounded-full hover:bg-gray-700;
+  }
+
+  /* Dynamic Dark Mode Fallbacks - Forces minimum contrast for un-adapted Tailwind classes */
   .dark .text-gray-900:not([class*="dark:text-"]) {
     color: theme('colors.gray.100') !important;
   }
@@ -22,7 +51,7 @@
   .dark .text-gray-600:not([class*="dark:text-"]) {
     color: theme('colors.gray.400') !important;
   }
-  .dark .text-gray-500:not([class*="dark:text-"]) {
+  .dark .text-gray-500:not([class*="dark:text-s"]) {
     color: theme('colors.gray.400') !important;
   }
   .dark .bg-white:not([class*="dark:bg-"]) {
@@ -40,4 +69,22 @@
   .dark .border-gray-150:not([class*="dark:border-"]) {
     border-color: theme('colors.gray.800') !important;
   }
+
+  .p-fluid-xs { padding: var(--fluid-space-xs); }
+  .p-fluid-sm { padding: var(--fluid-space-sm); }
+  .p-fluid-md { padding: var(--fluid-space-md); }
+  .p-fluid-lg { padding: var(--fluid-space-lg); }
+  .p-fluid-xl { padding: var(--fluid-space-xl); }
+
+  .m-fluid-xs { margin: var(--fluid-space-xs); }
+  .m-fluid-sm { margin: var(--fluid-space-sm); }
+  .m-fluid-md { margin: var(--fluid-space-md); }
+  .m-fluid-lg { margin: var(--fluid-space-lg); }
+  .m-fluid-xl { margin: var(--fluid-space-xl); }
+
+  .gap-fluid-xs { gap: var(--fluid-space-xs); }
+  .gap-fluid-sm { gap: var(--fluid-space-sm); }
+  .gap-fluid-md { gap: var(--fluid-space-md); }
+  .gap-fluid-lg { gap: var(--fluid-space-lg); }
+  .gap-fluid-xl { gap: var(--fluid-space-xl); }
 }

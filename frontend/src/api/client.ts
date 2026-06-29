@@ -6,6 +6,7 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 // Request Interceptor: Attach JWT token to every request
@@ -27,9 +28,13 @@ apiClient.interceptors.response.use(
     const dataDetail = error.response?.data?.detail;
 
     if (status === 401) {
-      // Token expired or invalid — force logout and redirect via useAppStore
-      useAppStore.getState().logout();
-      window.location.href = '/login';
+      const isLogoutRequest = error.config?.url?.endsWith('/auth/logout');
+      if (!isLogoutRequest && (useAppStore.getState().user !== null || useAppStore.getState().token !== null)) {
+        useAppStore.getState().logout();
+      }
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
+        window.location.href = '/login';
+      }
       return Promise.reject(error);
     }
 

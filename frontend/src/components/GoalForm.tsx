@@ -7,6 +7,8 @@ import { useToastStore } from '../store/useToastStore';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
+import { AlertTriangle, CheckCircle2 } from 'lucide-react';
+
 
 const THRUST_AREAS = [
   "Financial Performance",
@@ -168,7 +170,7 @@ export const GoalForm = () => {
 
         return (
           <div className="bg-red-50 border border-red-200 dark:bg-red-950/20 dark:border-red-900/50 p-4 rounded-xl flex gap-3 shadow-sm animate-in slide-in-from-top-4 duration-300">
-            <span className="text-red-500 dark:text-red-400 text-xl flex-shrink-0">⚠️</span>
+            <AlertTriangle className="w-5 h-5 text-red-500 dark:text-red-450 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="text-sm font-bold text-red-900 dark:text-red-100">Manager Returned for Rework</h3>
               <div className="mt-1 text-sm text-red-700 dark:text-red-300 whitespace-pre-line leading-relaxed">
@@ -228,13 +230,19 @@ export const GoalForm = () => {
         </div>
         
         {totalProjectedWeightage > 100 && (
-          <p className="text-xs text-red-500 mt-2 font-medium">⚠️ Warning: Total weightage across all goals cannot exceed 100%.</p>
+          <p className="text-xs text-red-500 mt-2 font-medium flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Total weightage across all goals cannot exceed 100%.
+          </p>
         )}
         {totalProjectedWeightage !== 100 && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium">⚠️ Strict Limit: Total weightage must be exactly 100% to submit sheet for manager approval. (Current: {totalProjectedWeightage}%)</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-medium flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" /> Strict Limit: Total weightage must be exactly 100% to submit sheet for manager approval. (Current: {totalProjectedWeightage}%)
+          </p>
         )}
         {totalProjectedWeightage === 100 && (
-          <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-semibold">✅ Perfect! Total weightage is exactly 100%. Ready to submit.</p>
+          <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-semibold flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> Perfect! Total weightage is exactly 100%. Ready to submit.
+          </p>
         )}
       </Card>
 
