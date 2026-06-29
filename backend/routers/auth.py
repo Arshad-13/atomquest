@@ -107,7 +107,11 @@ async def login_with_azure(
         samesite="lax",
         secure=is_prod
     )
-    return {"message": "SSO login successful"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "message": "SSO login successful"
+    }
 
 
 @router.post("/login")
@@ -149,7 +153,11 @@ def login_for_access_token(
         samesite="lax",
         secure=is_prod
     )
-    return {"message": "Login successful"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "message": "Login successful"
+    }
 
 
 @router.post("/logout")

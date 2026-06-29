@@ -21,13 +21,16 @@ msalInstance.initialize().then(async () => {
     const redirectResult = await msalInstance.handleRedirectPromise();
     if (redirectResult?.accessToken) {
       // Exchange the MSAL token for our app's JWT
-      await apiClient.post(
+      const res = await apiClient.post(
         '/auth/azure',
         { access_token: redirectResult.accessToken }
       );
-      const meRes = await apiClient.get('/auth/me');
+      const token = res.data.access_token;
+      const meRes = await apiClient.get('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       // Store auth state before React renders — app will boot into dashboard
-      useAppStore.getState().setAuth(meRes.data, 'session');
+      useAppStore.getState().setAuth(meRes.data, token);
     }
   } catch (err) {
     console.error('[SSO] Redirect token exchange failed:', err);

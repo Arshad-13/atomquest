@@ -26,13 +26,16 @@ export const Login = () => {
       formData.append('username', data.email);
       formData.append('password', data.password);
 
-      await apiClient.post(
+      const res = await apiClient.post(
         '/auth/login',
         formData,
         { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
       );
-      const meResponse = await apiClient.get('/auth/me');
-      setAuth(meResponse.data, 'session');
+      const token = res.data.access_token;
+      const meResponse = await apiClient.get('/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setAuth(meResponse.data, token);
     } catch (error: any) {
       if (error.response?.status === 401) {
         setServerError('Invalid email or password.');
